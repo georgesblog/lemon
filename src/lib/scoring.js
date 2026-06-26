@@ -12,13 +12,17 @@
 //  - bulking  → cheap calories/protein matter most (value)
 //  - balanced → a sensible all-rounder default
 export const PRESETS = {
-  balanced: { label: 'Balanced', weights: { value: 0.4, proteinCal: 0.35, sugarCarb: 0.25 } },
-  cutting: { label: 'Cutting', weights: { value: 0.3, proteinCal: 0.5, sugarCarb: 0.2 } },
-  bulking: { label: 'Bulking', weights: { value: 0.6, proteinCal: 0.3, sugarCarb: 0.1 } },
+  balanced: { label: 'Balanced', weights: { value: 0.3, proteinCal: 0.4, sugarCarb: 0.3 } },
+  cutting: { label: 'Cutting', weights: { value: 0.15, proteinCal: 0.55, sugarCarb: 0.3 } },
+  bulking: { label: 'Bulking', weights: { value: 0.5, proteinCal: 0.35, sugarCarb: 0.15 } },
 }
 
 export const DEFAULT_PRESET = 'balanced'
 export const DEFAULT_PROTEIN_TARGET = 150 // grams/day
+
+// A typical lactose baseline (g per 100g) we forgive for dairy, so naturally
+// occurring milk sugars aren't penalised like added sugar.
+export const LACTOSE_ALLOWANCE = 5
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n))
 const num = (v) => (Number.isFinite(+v) ? +v : 0)
@@ -34,13 +38,18 @@ export function costPer100gProtein({ price, packGrams, proteinPer100g }) {
 
 // ── Sub-scores (each 0–10) ───────────────────────────────────────────────────
 
-// Value: cheap protein scores high. £0.50/100g protein or less → 10,
-// £6.00/100g protein or more → 0, linear in between.
+// Value: cheap protein scores high. A smooth curve that sinks toward — but
+// never reaches — 0, so any two real items always get an ordered, comparable
+// score (the whole point of comparing protein deals in the aisle). Anchored so
+// £4 / 100g protein scores exactly 5/10 ("a fair deal"); bargains climb toward
+// 10, rip-offs sink toward ~1 but never flatline.
+export const FAIR_COST_PER_100G_PROTEIN = 4.0 // £/100g protein that scores 5/10
+const VALUE_STEEPNESS = 1.6 // how sharply the score falls away from the fair price
+
 export function valueScore(cost) {
-  if (cost == null) return 0
-  const LOW = 0.5
-  const HIGH = 6.0
-  return clamp(10 - ((cost - LOW) / (HIGH - LOW)) * 10, 0, 10)
+  // null/0 means no price or no protein yet — there's no deal to score.
+  if (cost == null || cost <= 0) return 0
+  return clamp(10 / (1 + Math.pow(cost / FAIR_COST_PER_100G_PROTEIN, VALUE_STEEPNESS)), 0, 10)
 }
 
 // Protein-to-calorie quality: grams of protein per 100 kcal. Higher is leaner.
@@ -54,6 +63,7 @@ export function proteinCalScore(proteinPer100g, kcalPer100g) {
 
 // Sugar-to-carb quality: what fraction of carbs are sugar. Lower is better.
 // All-starch (0% sugar) → 10, all-sugar → 0. No carbs at all → 10 (a non-issue).
+// Dairy's natural lactose is forgiven upstream in scoreItem before this runs.
 export function sugarCarbScore(sugarPer100g, carbsPer100g) {
   const carbs = num(carbsPer100g)
   if (carbs <= 0) return 10
@@ -74,7 +84,13 @@ export function scoreItem(item, weights = PRESETS[DEFAULT_PRESET].weights) {
 
   const value = valueScore(cost)
   const proteinCal = proteinCalScore(n.proteins, n.energyKcal)
-  const sugarCarb = sugarCarbScore(n.sugars, n.carbs)
+
+  // For dairy, forgive a typical lactose baseline so naturally occurring milk
+  // sugars don't tank the sugar-to-carb score the way added sugar should.
+  const effectiveSugars = item.isDairy
+    ? Math.max(0, num(n.sugars) - LACTOSE_ALLOWANCE)
+    : num(n.sugars)
+  const sugarCarb = sugarCarbScore(effectiveSugars, n.carbs)
 
   const composite =
     value * weights.value +

@@ -19,6 +19,7 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
   const [carbs, setCarbs] = useState(numStr(n.carbs))
   const [sugars, setSugars] = useState(numStr(n.sugars))
   const [fat, setFat] = useState(numStr(n.fat))
+  const [isDairy, setIsDairy] = useState(!!draft?.isDairy)
 
   const candidate = useMemo(
     () => ({
@@ -27,6 +28,7 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
       brand,
       price: parseFloat(price),
       packGrams: parseFloat(packGrams),
+      isDairy,
       nutriments: {
         proteins: parseFloat(proteins),
         energyKcal: parseFloat(energyKcal),
@@ -35,7 +37,7 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         fat: parseFloat(fat),
       },
     }),
-    [draft, name, brand, price, packGrams, proteins, energyKcal, carbs, sugars, fat]
+    [draft, name, brand, price, packGrams, isDairy, proteins, energyKcal, carbs, sugars, fat]
   )
 
   const score = useMemo(() => scoreItem(candidate, weights), [candidate, weights])
@@ -107,6 +109,19 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         <NumField label="Sugars (g)" value={sugars} onChange={setSugars} />
         <NumField label="Fat (g)" value={fat} onChange={setFat} />
       </div>
+
+      <label className="row" style={{ gap: 10, margin: '6px 2px 2px', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={isDairy}
+          onChange={(e) => setIsDairy(e.target.checked)}
+          style={{ width: 18, height: 18 }}
+        />
+        <span className="small">
+          Dairy — forgive natural lactose in the sugar score
+          {draft?.isDairy ? <span className="muted"> · auto-detected</span> : null}
+        </span>
+      </label>
 
       <div className="card" style={{ marginTop: 12 }}>
         <MetricBar label="Protein value (£/100g protein)" score={score.subScores.value}
