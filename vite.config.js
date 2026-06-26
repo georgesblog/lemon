@@ -2,9 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Base path. Local dev/preview serve from "/"; the GitHub Pages build sets
+// BASE_PATH=/lemon/ (project sites live under /<repo>/) so every asset, the
+// service worker and the manifest resolve correctly under the subpath.
+const base = process.env.BASE_PATH || '/'
+
 // Basket Score is a personal-use mobile web app. We ship it as an installable
 // PWA so it can live on the home screen and grab camera access for scanning.
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -18,7 +24,8 @@ export default defineConfig({
         background_color: '#0f1115',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
+        scope: base,
+        start_url: base,
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
