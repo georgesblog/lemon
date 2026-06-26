@@ -181,6 +181,7 @@ function blankDraft(barcode) {
     image: null,
     price: null,
     packGrams: null,
+    isDairy: false,
     nutriments: { proteins: null, energyKcal: null, carbs: null, sugars: null, fat: null },
   }
 }

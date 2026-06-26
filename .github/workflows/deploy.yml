@@ -1,12 +1,13 @@
 name: Deploy to GitHub Pages
 
-# Builds the PWA and publishes it to GitHub Pages on every push to the working
-# branch. Pages serves project sites under /<repo>/, so we build with
-# BASE_PATH=/lemon/ to match https://georgesblog.github.io/lemon/.
+# Builds the PWA and publishes it to GitHub Pages on every push to main (Pages
+# deploys from main), plus manual dispatch. Pages serves project sites under
+# /<repo>/, so we build with BASE_PATH=/lemon/ to match
+# https://georgesblog.github.io/lemon/.
 on:
   push:
     branches:
-      - claude/basket-score-app-mgzyhh
+      - main
   workflow_dispatch:
 
 # Permissions the deploy-pages action needs.

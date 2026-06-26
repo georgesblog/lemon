@@ -8,7 +8,20 @@ const FIELDS = [
   'quantity',
   'serving_size',
   'image_front_small_url',
+  'categories_tags',
 ].join(',')
+
+// Open Food Facts category tags look like "en:greek-yogurts". If a product
+// reads as dairy we forgive its natural lactose in the sugar-to-carb score.
+const DAIRY_HINTS = [
+  'dairy', 'dairies', 'yogurt', 'yoghurt', 'milk', 'kefir', 'skyr', 'quark',
+  'fromage', 'cheese', 'cream',
+]
+
+export function looksDairy(categoriesTags) {
+  if (!Array.isArray(categoriesTags)) return false
+  return categoriesTags.some((t) => DAIRY_HINTS.some((h) => String(t).includes(h)))
+}
 
 // Parse Open Food Facts' free-text quantity ("450 g", "1 L", "4 x 125g") into
 // grams. Returns null if we can't tell, so the UI can ask the user.
@@ -86,6 +99,7 @@ export async function fetchProduct(barcode, { signal } = {}) {
     image: p.image_front_small_url || null,
     quantityText: p.quantity || p.serving_size || '',
     packGrams: parseGrams(p.quantity) ?? parseGrams(p.serving_size),
+    isDairy: looksDairy(p.categories_tags),
     nutriments: normaliseNutriments(p.nutriments),
   }
 }
