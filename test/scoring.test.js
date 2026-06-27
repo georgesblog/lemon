@@ -10,7 +10,7 @@ import {
   packTotals,
   PRESETS,
 } from '../src/lib/scoring.js'
-import { parseGrams, looksDairy } from '../src/lib/openfoodfacts.js'
+import { parseGrams, looksDairy, normaliseNutriments } from '../src/lib/openfoodfacts.js'
 
 test('costPer100gProtein: £2 for a 450g tub at 10g protein/100g', () => {
   // 450g × 10/100 = 45g protein. £2 / (45/100) = £4.44 per 100g protein.
@@ -124,6 +124,32 @@ test('looksDairy detects dairy category tags', () => {
   assert.equal(looksDairy(['en:cheeses']), true)
   assert.equal(looksDairy(['en:snacks', 'en:biscuits']), false)
   assert.equal(looksDairy(undefined), false)
+})
+
+test('packTotals and basket totals include fibre and saturated fat', () => {
+  const item = { price: 2, packGrams: 200, nutriments: { proteins: 10, energyKcal: 60, carbs: 4, sugars: 2, fiber: 3, fat: 1, saturatedFat: 0.5 } }
+  const t = packTotals(item)
+  assert.equal(t.fiber, 6) // 3g/100g × 200g
+  assert.equal(t.satFat, 1)
+  const sum = basketSummary([{ id: 'a', ...item }], PRESETS.balanced.weights)
+  assert.equal(sum.totals.fiber, 6)
+  assert.equal(sum.totals.satFat, 1)
+})
+
+test('normaliseNutriments reads fibre and saturated fat, both spellings', () => {
+  const n = normaliseNutriments({ proteins_100g: 10, 'saturated-fat_100g': 2, fiber_100g: 3, 'energy-kcal_100g': 60 })
+  assert.equal(n.proteins, 10)
+  assert.equal(n.saturatedFat, 2)
+  assert.equal(n.fiber, 3)
+  assert.equal(normaliseNutriments({ fibre_100g: 5 }).fiber, 5) // British spelling fallback
+})
+
+test('normaliseNutriments derives per-100g from per-serving when 100g is missing', () => {
+  // 12g protein in a 30g serving → 40g per 100g
+  const n = normaliseNutriments({ proteins_serving: 12 }, 30)
+  assert.equal(n.proteins, 40)
+  // but the per-100g value wins when present
+  assert.equal(normaliseNutriments({ proteins_100g: 11, proteins_serving: 12 }, 30).proteins, 11)
 })
 
 test('parseGrams handles common quantity strings', () => {

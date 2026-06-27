@@ -6,9 +6,17 @@ const FIELDS = [
   'brands',
   'nutriments',
   'quantity',
+  'product_quantity', // numeric pack size, more reliable than parsing `quantity`
+  'product_quantity_unit',
   'serving_size',
+  'serving_quantity', // numeric serving size (g), used to derive per-100g if needed
+  'nutrition_data_per', // "100g" or "serving" — guards our per-100g assumption
   'image_front_small_url',
+  'image_nutrition_small_url', // photo of the label, to verify/correct macros
   'categories_tags',
+  'nova_group', // 1–4 processing level
+  'nutriscore_grade', // a–e health grade
+  'nutrient_levels', // low/moderate/high for fat, sat-fat, sugars, salt
 ].join(',')
 
 // Open Food Facts category tags look like "en:greek-yogurts". If a product
@@ -61,22 +69,36 @@ function toGrams(value, unit) {
   }
 }
 
-// Normalise the noisy nutriments object into the handful of per-100g numbers we
-// score on. Missing values come back as null so the UI can flag/ask.
-function normaliseNutriments(n = {}) {
-  const pick = (...keys) => {
-    for (const k of keys) {
-      if (n[k] != null && Number.isFinite(+n[k])) return +n[k]
+// Normalise the noisy nutriments object into the per-100g numbers we use.
+// Prefers the per-100g value Open Food Facts computes; if that's missing but a
+// per-serving value and a known serving size exist, derives per-100g ourselves
+// (so products entered "per serving" still score correctly). Missing values
+// come back as null so the UI can flag/ask.
+export function normaliseNutriments(n = {}, servingQuantity = null) {
+  const num = (v) => (v != null && Number.isFinite(+v) ? +v : null)
+  const sq = num(servingQuantity) && +servingQuantity > 0 ? +servingQuantity : null
+  const per100 = (...bases) => {
+    for (const b of bases) {
+      const direct = num(n[`${b}_100g`])
+      if (direct != null) return direct
+    }
+    if (sq) {
+      for (const b of bases) {
+        const sv = num(n[`${b}_serving`])
+        if (sv != null) return Math.round((sv * 100 / sq) * 100) / 100
+      }
     }
     return null
   }
   return {
-    proteins: pick('proteins_100g'),
-    energyKcal: pick('energy-kcal_100g', 'energy_100g'),
-    carbs: pick('carbohydrates_100g'),
-    sugars: pick('sugars_100g'),
-    fat: pick('fat_100g'),
-    salt: pick('salt_100g'),
+    proteins: per100('proteins'),
+    energyKcal: per100('energy-kcal', 'energy'),
+    carbs: per100('carbohydrates'),
+    sugars: per100('sugars'),
+    fiber: per100('fiber', 'fibre'),
+    fat: per100('fat'),
+    saturatedFat: per100('saturated-fat'),
+    salt: per100('salt'),
   }
 }
 
@@ -92,14 +114,27 @@ export async function fetchProduct(barcode, { signal } = {}) {
   if (data.status !== 1 || !data.product) return null
 
   const p = data.product
+  // Prefer the numeric product_quantity (g/ml) over regex-parsing the free-text
+  // quantity string; fall back to parsing when it's absent.
+  const numericQty =
+    Number.isFinite(+p.product_quantity) && +p.product_quantity > 0
+      ? Math.round(+p.product_quantity)
+      : null
+
   return {
     barcode,
     name: p.product_name?.trim() || '',
     brand: p.brands?.split(',')[0]?.trim() || '',
     image: p.image_front_small_url || null,
+    nutritionImage: p.image_nutrition_small_url || null,
     quantityText: p.quantity || p.serving_size || '',
-    packGrams: parseGrams(p.quantity) ?? parseGrams(p.serving_size),
+    packGrams: numericQty ?? parseGrams(p.quantity) ?? parseGrams(p.serving_size),
+    servingQuantity: Number.isFinite(+p.serving_quantity) ? +p.serving_quantity : null,
+    nutritionDataPer: p.nutrition_data_per || null, // "100g" | "serving"
     isDairy: looksDairy(p.categories_tags),
-    nutriments: normaliseNutriments(p.nutriments),
+    novaGroup: Number.isFinite(+p.nova_group) ? +p.nova_group : null,
+    nutriscoreGrade: p.nutriscore_grade ? String(p.nutriscore_grade).toUpperCase() : null,
+    nutrientLevels: p.nutrient_levels || null,
+    nutriments: normaliseNutriments(p.nutriments, p.serving_quantity),
   }
 }
