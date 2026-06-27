@@ -179,10 +179,19 @@ function blankDraft(barcode) {
     name: '',
     brand: '',
     image: null,
+    nutritionImage: null,
     price: null,
     packGrams: null,
+    servingQuantity: null,
+    nutritionDataPer: null,
     isDairy: false,
-    nutriments: { proteins: null, energyKcal: null, carbs: null, sugars: null, fat: null },
+    novaGroup: null,
+    nutriscoreGrade: null,
+    nutrientLevels: null,
+    nutriments: {
+      proteins: null, energyKcal: null, carbs: null, sugars: null,
+      fiber: null, fat: null, saturatedFat: null,
+    },
   }
 }
 

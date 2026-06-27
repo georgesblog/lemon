@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { scoreItem, verdict } from '../lib/scoring.js'
-import { gbp, one } from '../lib/format.js'
-import { ScoreBadge, MetricBar } from './Bits.jsx'
+import { gbp } from '../lib/format.js'
+import { ScoreBadge, MetricBar, NutriScore, NovaBadge } from './Bits.jsx'
 
 // Confirm & price a scanned item — or fill one in by hand. Nutrition arrives
 // pre-filled from Open Food Facts but every field is editable in case the API
@@ -18,10 +18,14 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
   const [energyKcal, setEnergyKcal] = useState(numStr(n.energyKcal))
   const [carbs, setCarbs] = useState(numStr(n.carbs))
   const [sugars, setSugars] = useState(numStr(n.sugars))
+  const [fiber, setFiber] = useState(numStr(n.fiber))
   const [fat, setFat] = useState(numStr(n.fat))
+  const [saturatedFat, setSaturatedFat] = useState(numStr(n.saturatedFat))
   const [isDairy, setIsDairy] = useState(!!draft?.isDairy)
 
   const candidate = useMemo(
+    // ...draft carries through OFF-derived extras (novaGroup, nutriscoreGrade,
+    // nutrientLevels, nutritionDataPer, images) we don't edit but want to keep.
     () => ({
       ...draft,
       name,
@@ -34,10 +38,12 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         energyKcal: parseFloat(energyKcal),
         carbs: parseFloat(carbs),
         sugars: parseFloat(sugars),
+        fiber: parseFloat(fiber),
         fat: parseFloat(fat),
+        saturatedFat: parseFloat(saturatedFat),
       },
     }),
-    [draft, name, brand, price, packGrams, isDairy, proteins, energyKcal, carbs, sugars, fat]
+    [draft, name, brand, price, packGrams, isDairy, proteins, energyKcal, carbs, sugars, fiber, fat, saturatedFat]
   )
 
   const score = useMemo(() => scoreItem(candidate, weights), [candidate, weights])
@@ -70,6 +76,22 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         </div>
         <ScoreBadge score={score.composite} size="lg" />
       </div>
+
+      {/* Open Food Facts context badges (health grade + processing level) */}
+      {(draft?.nutriscoreGrade || draft?.novaGroup) && (
+        <div className="row" style={{ gap: 8, margin: '0 2px 12px' }}>
+          <NutriScore grade={draft.nutriscoreGrade} />
+          <NovaBadge group={draft.novaGroup} />
+          <span className="muted small">health context (from Open Food Facts)</span>
+        </div>
+      )}
+
+      {draft?.nutritionDataPer === 'serving' && (
+        <div className="card small" style={{ borderColor: 'var(--warn)', marginTop: 0 }}>
+          ⚠️ Label data was given per serving — we've converted it to per 100g.
+          Double-check the numbers below.
+        </div>
+      )}
 
       <div className="field">
         <label>Item name</label>
@@ -107,7 +129,9 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         <NumField label="Energy (kcal)" value={energyKcal} onChange={setEnergyKcal} />
         <NumField label="Carbs (g)" value={carbs} onChange={setCarbs} />
         <NumField label="Sugars (g)" value={sugars} onChange={setSugars} />
+        <NumField label="Fibre (g)" value={fiber} onChange={setFiber} />
         <NumField label="Fat (g)" value={fat} onChange={setFat} />
+        <NumField label="Saturates (g)" value={saturatedFat} onChange={setSaturatedFat} />
       </div>
 
       <label className="row" style={{ gap: 10, margin: '6px 2px 2px', cursor: 'pointer' }}>

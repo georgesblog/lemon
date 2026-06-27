@@ -1,5 +1,31 @@
 import { scoreColor, one } from '../lib/format.js'
 
+// Official Nutri-Score letter grade (A best … E worst), in its standard colours.
+const NUTRI_COLORS = { A: '#038141', B: '#85bb2f', C: '#fecb02', D: '#ee8100', E: '#e63e11' }
+export function NutriScore({ grade }) {
+  const g = grade ? String(grade).toUpperCase() : null
+  if (!g || !NUTRI_COLORS[g]) return null
+  const dark = g === 'C' // amber needs dark text for contrast
+  return (
+    <span className="tag-badge" style={{ background: NUTRI_COLORS[g], color: dark ? '#0f1115' : '#fff' }}
+      title="Nutri-Score (A best, E worst)">
+      Nutri {g}
+    </span>
+  )
+}
+
+// NOVA food-processing group (1 unprocessed … 4 ultra-processed).
+const NOVA_COLORS = { 1: '#3a7d44', 2: '#b88a00', 3: '#d2691e', 4: '#c0392b' }
+export function NovaBadge({ group }) {
+  if (!group || !NOVA_COLORS[group]) return null
+  return (
+    <span className="tag-badge" style={{ background: NOVA_COLORS[group], color: '#fff' }}
+      title="NOVA processing group (1 = unprocessed, 4 = ultra-processed)">
+      NOVA {group}
+    </span>
+  )
+}
+
 // A square score badge, coloured by value, reading "X.X / 10".
 export function ScoreBadge({ score, size = 'md' }) {
   const color = scoreColor(score)

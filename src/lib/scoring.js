@@ -121,13 +121,15 @@ export function packTotals(item) {
     kcal: num(n.energyKcal) * factor,
     carbs: num(n.carbs) * factor,
     sugars: num(n.sugars) * factor,
+    fiber: num(n.fiber) * factor,
     fat: num(n.fat) * factor,
+    satFat: num(n.saturatedFat) * factor,
   }
 }
 
 // ── Basket-level aggregates ──────────────────────────────────────────────────
 export function basketSummary(items, weights, proteinTarget = DEFAULT_PROTEIN_TARGET) {
-  const totals = { price: 0, protein: 0, kcal: 0, carbs: 0, sugars: 0, fat: 0 }
+  const totals = { price: 0, protein: 0, kcal: 0, carbs: 0, sugars: 0, fiber: 0, fat: 0, satFat: 0 }
   let scoreSpendWeighted = 0
 
   for (const item of items) {
@@ -137,7 +139,9 @@ export function basketSummary(items, weights, proteinTarget = DEFAULT_PROTEIN_TA
     totals.kcal += t.kcal
     totals.carbs += t.carbs
     totals.sugars += t.sugars
+    totals.fiber += t.fiber
     totals.fat += t.fat
+    totals.satFat += t.satFat
     scoreSpendWeighted += scoreItem(item, weights).composite * t.price
   }
 

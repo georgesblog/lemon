@@ -1,6 +1,6 @@
 import { scoreItem, verdict, basketSummary } from '../lib/scoring.js'
-import { gbp, grams, kcal, one } from '../lib/format.js'
-import { ScoreBadge } from './Bits.jsx'
+import { gbp, grams, kcal } from '../lib/format.js'
+import { ScoreBadge, NutriScore, NovaBadge } from './Bits.jsx'
 
 // The home view: a ranked list of scored items plus live basket totals.
 export default function Basket({ items, weights, proteinTarget, onOpen, onRemove }) {
@@ -57,6 +57,12 @@ function ItemCard({ item, score, onOpen, onRemove }) {
             ? `${gbp(score.costPer100gProtein)} / 100g protein`
             : 'No protein value'}
         </div>
+        {(item.nutriscoreGrade || item.novaGroup) && (
+          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+            <NutriScore grade={item.nutriscoreGrade} />
+            <NovaBadge group={item.novaGroup} />
+          </div>
+        )}
       </div>
       <button className="iconbtn" onClick={onRemove} aria-label="Remove item">✕</button>
     </div>
@@ -81,6 +87,7 @@ function BasketSummary({ summary }) {
         <div className="spread"><span className="k">Energy</span><span className="v">{kcal(totals.kcal)}</span></div>
         <div className="spread"><span className="k">Carbs</span><span className="v">{grams(totals.carbs)}</span></div>
         <div className="spread"><span className="k">Sugars</span><span className="v">{grams(totals.sugars)}</span></div>
+        <div className="spread"><span className="k">Fibre</span><span className="v">{grams(totals.fiber)}</span></div>
         <div className="spread"><span className="k">Fat</span><span className="v">{grams(totals.fat)}</span></div>
       </div>
 
