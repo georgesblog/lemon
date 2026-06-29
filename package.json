@@ -1,7 +1,7 @@
 {
   "name": "basket-score",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Scan → Price → Score. A fitness-value scoring PWA for your grocery basket.",
   "scripts": {
@@ -14,7 +14,8 @@
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zxing-wasm": "^3.1.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

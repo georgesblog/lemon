@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-29
+
 ### Added
-- **Hybrid barcode scanner** following Open Food Facts' smooth-app strategy:
-  use the browser-native `BarcodeDetector` (the web equivalent of their default
-  ML Kit engine) on Android Chrome / modern desktop Chromium, and fall back to
-  ZXing elsewhere (notably all iOS browsers and Firefox). The far-stronger
-  native path also means ZXing's ~390 kB no longer downloads on those devices.
+- **Hybrid barcode scanner** following Open Food Facts' smooth-app strategy of
+  "use the strongest decoder the platform offers", with three tiers, best first:
+  1. the browser-native **`BarcodeDetector`** (the web equivalent of smooth-app's
+     default ML Kit engine) on Android Chrome / modern desktop Chromium;
+  2. **`zxing-wasm`** — the C++ ZXing compiled to WebAssembly, far stronger on
+     blurry / curved / low-light barcodes than the pure-JS port. This is the
+     path iOS browsers and Firefox take, since WebKit has no `BarcodeDetector`;
+  3. the pure-JS **`@zxing/browser`** as a last-resort fallback.
+
+  The `.wasm` is bundled and served from our own origin (no CDN), so it works
+  offline and behind a strict network policy. Each engine is loaded on demand,
+  so a device only downloads the decoder it actually uses.
 - **Torch / flashlight toggle** in the scanner (where the camera supports it),
   to rescue dim and curved-surface reads.
 - Barcode normalisation mirroring smooth-app's `_fixBarcodeIfNecessary`: strip
@@ -32,9 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Hard-to-read barcodes (curved tubs, blurry, low light) now decode far more
-  reliably on the ZXing fallback path: `TRY_HARDER` decoding plus a 1920×1080
-  continuous-focus camera request, instead of the previous default fast scan at
-  unconstrained resolution.
+  reliably. All engines get a **1920×1080 continuous-focus** camera request
+  (was an unconstrained-resolution default), and both ZXing fallbacks run with
+  `TRY_HARDER` rather than the default fast scan.
 - Products whose nutrition is declared **per serving** are now converted to
   per-100g (using the serving size) so scores stay valid, with a warning in the
   confirm form.
@@ -78,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `localStorage`, Open Food Facts lookups cached.
 - GitHub Pages deployment workflow.
 
-[Unreleased]: https://github.com/georgesblog/lemon/compare/afc3ed3...main
+[Unreleased]: https://github.com/georgesblog/lemon/compare/main...claude/basket-score-app-mgzyhh
+[0.3.0]: https://github.com/georgesblog/lemon/compare/afc3ed3...main
 [0.2.0]: https://github.com/georgesblog/lemon/compare/8e9e1eb...afc3ed3
 [0.1.0]: https://github.com/georgesblog/lemon/commits/8e9e1eb
