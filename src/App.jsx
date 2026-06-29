@@ -4,6 +4,7 @@ import Basket from './components/Basket.jsx'
 import Compare from './components/Compare.jsx'
 import Settings from './components/Settings.jsx'
 import { fetchProduct } from './lib/openfoodfacts.js'
+import { isRestrictedCirculation } from './lib/barcode.js'
 import { PRESETS, DEFAULT_PRESET, DEFAULT_PROTEIN_TARGET } from './lib/scoring.js'
 import { loadBasket, saveBasket, loadSettings, saveSettings, makeId } from './lib/storage.js'
 
@@ -44,6 +45,10 @@ export default function App() {
         const product = await fetchProduct(barcode)
         if (product) {
           setEditing({ ...product, id: null, price: null })
+        } else if (isRestrictedCirculation(barcode)) {
+          // Store-internal / variable-weight barcode — never in Open Food Facts.
+          flash('Looks like a store-internal barcode — add it by hand')
+          setEditing(blankDraft(barcode))
         } else {
           flash('Not in Open Food Facts — add it by hand')
           setEditing(blankDraft(barcode))
@@ -188,6 +193,11 @@ function blankDraft(barcode) {
     novaGroup: null,
     nutriscoreGrade: null,
     nutrientLevels: null,
+    categoryTag: null,
+    dietary: { vegan: null, vegetarian: null, palmOil: null },
+    additivesCount: null,
+    allergens: [],
+    traces: [],
     nutriments: {
       proteins: null, energyKcal: null, carbs: null, sugars: null,
       fiber: null, fat: null, saturatedFat: null,

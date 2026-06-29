@@ -127,6 +127,21 @@ export function packTotals(item) {
   }
 }
 
+// Per-serving macros from per-100g nutrition + a serving size in grams. Lets
+// the UI frame protein bars / shakes "per scoop" the way the label does.
+// Returns null when there's no serving size to scale by.
+export function servingMacros(nutriments = {}, servingGrams) {
+  const g = num(servingGrams)
+  if (g <= 0) return null
+  const factor = g / 100
+  return {
+    grams: g,
+    protein: num(nutriments.proteins) * factor,
+    kcal: num(nutriments.energyKcal) * factor,
+    sugars: num(nutriments.sugars) * factor,
+  }
+}
+
 // ── Basket-level aggregates ──────────────────────────────────────────────────
 export function basketSummary(items, weights, proteinTarget = DEFAULT_PROTEIN_TARGET) {
   const totals = { price: 0, protein: 0, kcal: 0, carbs: 0, sugars: 0, fiber: 0, fat: 0, satFat: 0 }

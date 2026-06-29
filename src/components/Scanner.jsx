@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { normaliseBarcode, isValidEan13 } from '../lib/barcode.js'
+// URL of the bundled wasm asset (just a string here; Vite emits the binary as a
+// separate asset fetched on demand). The heavy reader JS is imported lazily.
+import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url'
 
-// Hybrid barcode scanner, mirroring Open Food Facts' smooth-app strategy:
-// prefer the platform's native ML-based detector, fall back to ZXing.
+// Hybrid barcode scanner, mirroring Open Food Facts' smooth-app strategy of
+// "use the strongest decoder the platform offers". Three tiers, best first:
 //
-//  • Native `BarcodeDetector` (Android Chrome, modern desktop Chromium) is the
-//    web equivalent of smooth-app's default ML Kit engine — far more robust on
-//    blurry / curved / low-light barcodes, and ZXing never even downloads.
-//  • ZXing-JS is the fallback for browsers without it — notably *all* iOS
-//    browsers (WebKit has no BarcodeDetector) and Firefox. We push it harder
-//    than the defaults: TRY_HARDER, high resolution, and continuous focus.
+//  1. Native `BarcodeDetector` — Android Chrome / modern desktop Chromium. The
+//     web equivalent of smooth-app's default ML Kit engine.
+//  2. zxing-wasm — the C++ ZXing compiled to WebAssembly. Markedly stronger on
+//     blurry / curved / low-light 1D codes than the pure-JS port. This is the
+//     path iOS Safari and Firefox take (no native BarcodeDetector there).
+//  3. @zxing/browser (pure JS) — last-resort fallback if the wasm fails to load.
 //
-// Both paths share one camera stream so the torch toggle works regardless of
-// engine, and both run scanned codes through the same normalisation.
+// Manual entry is always available as the human backstop. Tiers 1–2 share one
+// rAF "grab a frame and decode it" loop; tier 3 uses ZXing's own continuous
+// callback. All paths share the camera stream so the torch toggle is uniform,
+// and every accepted code goes through the same normalisation.
 
-// Grocery 1D set + Code-128, matching smooth-app's restricted format list.
+// Native BarcodeDetector format ids.
 const NATIVE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+// zxing-wasm format ids (different spelling from the native API).
+const WASM_FORMATS = ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'Code128']
 
 const VIDEO_CONSTRAINTS = {
   facingMode: { ideal: 'environment' },
@@ -39,6 +46,26 @@ async function getNativeDetector() {
   }
 }
 
+// Lazily load zxing-wasm and point it at our bundled .wasm (served from our own
+// origin, so it works offline and behind a strict egress proxy — no CDN).
+let wasmReadyPromise = null
+async function ensureWasm() {
+  if (!wasmReadyPromise) {
+    wasmReadyPromise = (async () => {
+      const { readBarcodes, prepareZXingModule } = await import('zxing-wasm/reader')
+      await prepareZXingModule({
+        overrides: {
+          locateFile: (path, prefix) =>
+            path.endsWith('.wasm') ? wasmUrl : prefix + path,
+        },
+        fireImmediately: true,
+      })
+      return readBarcodes
+    })()
+  }
+  return wasmReadyPromise
+}
+
 export default function Scanner({ onDetected, onClose, onManual }) {
   const videoRef = useRef(null)
   const firedRef = useRef(false)
@@ -46,7 +73,7 @@ export default function Scanner({ onDetected, onClose, onManual }) {
   const trackRef = useRef(null)
 
   const [error, setError] = useState(null)
-  const [engine, setEngine] = useState(null) // 'native' | 'zxing'
+  const [engine, setEngine] = useState(null) // 'native' | 'wasm' | 'zxing'
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
 
@@ -84,69 +111,78 @@ export default function Scanner({ onDetected, onClose, onManual }) {
       if (caps.torch) setTorchAvailable(true)
     }
 
-    async function startNative(detector) {
-      setEngine('native')
+    // Shared decode loop for the native + wasm engines: pull a frame, hand it to
+    // `detect`, and reschedule. Awaiting the async detect paces the loop so we
+    // never pile up frames.
+    const runFrameLoop = (detect) => {
+      const tick = async () => {
+        if (cancelled || firedRef.current) return
+        try {
+          const code = await detect()
+          if (code) { fire(code); return }
+        } catch { /* transient decode error — keep going */ }
+        if (!cancelled && !firedRef.current) rafId = requestAnimationFrame(tick)
+      }
+      rafId = requestAnimationFrame(tick)
+    }
+
+    async function startStream() {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: VIDEO_CONSTRAINTS,
       })
-      if (cancelled) return
+      if (cancelled) return false
       const video = videoRef.current
       video.srcObject = stream
       await video.play().catch(() => {})
       wireTorch()
-
-      const scan = async () => {
-        if (cancelled || firedRef.current) return
-        try {
-          const codes = await detector.detect(video)
-          if (codes && codes.length) {
-            fire(codes[0].rawValue)
-            return
-          }
-        } catch { /* transient decode error — keep going */ }
-        rafId = requestAnimationFrame(scan)
-      }
-      rafId = requestAnimationFrame(scan)
-
       teardownRef.current = () => {
         if (rafId) cancelAnimationFrame(rafId)
         stream?.getTracks().forEach((t) => t.stop())
       }
+      return true
     }
 
-    async function startZxing() {
-      setEngine('zxing')
+    function makeWasmDetector(readBarcodes) {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      return async () => {
+        const video = videoRef.current
+        const w = video?.videoWidth || 0
+        const h = video?.videoHeight || 0
+        if (!w || !h) return null
+        canvas.width = w
+        canvas.height = h
+        ctx.drawImage(video, 0, 0, w, h)
+        const image = ctx.getImageData(0, 0, w, h)
+        const results = await readBarcodes(image, {
+          tryHarder: true,
+          formats: WASM_FORMATS,
+          maxNumberOfSymbols: 1,
+        })
+        return results?.[0]?.text || null
+      }
+    }
+
+    async function startZxingBrowser() {
+      // Pure-JS last resort: decode continuously off the running <video>.
       const { BrowserMultiFormatReader } = await import('@zxing/browser')
       const { DecodeHintType, BarcodeFormat } = await import('@zxing/library')
-
       const hints = new Map()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
-        BarcodeFormat.CODE_128,
+        BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
       ])
-      // The decisive setting for degraded/curved barcodes: ZXing's exhaustive
-      // pass (rotations + harder search) instead of the default fast scan.
       hints.set(DecodeHintType.TRY_HARDER, true)
-
-      const reader = new BrowserMultiFormatReader(hints, {
-        delayBetweenScanAttempts: 150,
-      })
-      const controls = await reader.decodeFromConstraints(
-        { audio: false, video: VIDEO_CONSTRAINTS },
+      const reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 150 })
+      const controls = await reader.decodeFromVideoElement(
         videoRef.current,
         (result) => { if (result) fire(result.getText()) }
       )
-      // decodeFromConstraints created the stream on the <video>; grab it so the
-      // torch toggle and teardown can reach the track.
-      stream = videoRef.current?.srcObject || null
-      wireTorch()
-
+      const stop = teardownRef.current
       teardownRef.current = () => {
         try { controls.stop() } catch { /* no-op */ }
+        stop()
       }
     }
 
@@ -154,9 +190,27 @@ export default function Scanner({ onDetected, onClose, onManual }) {
       try {
         const detector = await getNativeDetector()
         if (cancelled) return
-        if (detector) await startNative(detector)
-        else await startZxing()
-        if (cancelled) teardownRef.current()
+        if (!(await startStream())) return // permission/stream failure throws below
+
+        if (detector) {
+          setEngine('native')
+          runFrameLoop(async () => {
+            const codes = await detector.detect(videoRef.current)
+            return codes?.[0]?.rawValue || null
+          })
+          return
+        }
+
+        try {
+          const readBarcodes = await ensureWasm()
+          if (cancelled) return
+          setEngine('wasm')
+          runFrameLoop(makeWasmDetector(readBarcodes))
+        } catch {
+          if (cancelled) return
+          setEngine('zxing')
+          await startZxingBrowser()
+        }
       } catch (err) {
         if (cancelled) return
         setError(

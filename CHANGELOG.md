@@ -7,12 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-29
+
 ### Added
-- **Hybrid barcode scanner** following Open Food Facts' smooth-app strategy:
-  use the browser-native `BarcodeDetector` (the web equivalent of their default
-  ML Kit engine) on Android Chrome / modern desktop Chromium, and fall back to
-  ZXing elsewhere (notably all iOS browsers and Firefox). The far-stronger
-  native path also means ZXing's ~390 kB no longer downloads on those devices.
+- **Open Prices integration** — on scan, look up crowd-sourced prices for the
+  barcode (scoped to GBP) and show the typical price with a one-tap "use
+  average", plus an "is this a good price?" verdict (Cheapest seen / Below
+  average / Typical / Above average / Pricey) once you enter a price. Best-effort
+  and hidden when there's no data.
+- **"Best protein in this category"** — an on-demand lookup (Open Food Facts
+  search) listing the highest-protein products in the scanned item's category in
+  the UK, so you can spot a better deal than the one in your hand.
+- **Dietary & processing flags** on the confirm screen and basket cards: vegan /
+  vegetarian / palm-oil-free, and an additives count — straight from Open Food
+  Facts' ingredient analysis. Allergen and "may contain" lists are shown too.
+- **Per-serving framing** — when a serving size is known, the confirm screen
+  shows protein and calories per serving alongside the per-100g figures.
+- **Store-internal barcode detection** — restricted-circulation barcodes (loose
+  produce, deli, weighed items; GS1 prefix 2 / 02 / 04) are recognised and the
+  app tells you to enter the item by hand instead of failing a pointless lookup.
+- **Hybrid barcode scanner** following Open Food Facts' smooth-app strategy of
+  "use the strongest decoder the platform offers", with three tiers, best first:
+  1. the browser-native **`BarcodeDetector`** (the web equivalent of smooth-app's
+     default ML Kit engine) on Android Chrome / modern desktop Chromium;
+  2. **`zxing-wasm`** — the C++ ZXing compiled to WebAssembly, far stronger on
+     blurry / curved / low-light barcodes than the pure-JS port. This is the
+     path iOS browsers and Firefox take, since WebKit has no `BarcodeDetector`;
+  3. the pure-JS **`@zxing/browser`** as a last-resort fallback.
+
+  The `.wasm` is bundled and served from our own origin (no CDN), so it works
+  offline and behind a strict network policy. Each engine is loaded on demand,
+  so a device only downloads the decoder it actually uses.
 - **Torch / flashlight toggle** in the scanner (where the camera supports it),
   to rescue dim and curved-surface reads.
 - Barcode normalisation mirroring smooth-app's `_fixBarcodeIfNecessary`: strip
@@ -29,12 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pack size now uses Open Food Facts' numeric `product_quantity` when available
   (more reliable than parsing the free-text quantity string), falling back to
   text parsing. Pack size drives the £/100g-protein metric.
+- Nutri-Score now pins to the **2023** algorithm when Open Food Facts provides
+  the per-version data, so the grade doesn't shift if OFF changes its default.
 
 ### Fixed
 - Hard-to-read barcodes (curved tubs, blurry, low light) now decode far more
-  reliably on the ZXing fallback path: `TRY_HARDER` decoding plus a 1920×1080
-  continuous-focus camera request, instead of the previous default fast scan at
-  unconstrained resolution.
+  reliably. All engines get a **1920×1080 continuous-focus** camera request
+  (was an unconstrained-resolution default), and both ZXing fallbacks run with
+  `TRY_HARDER` rather than the default fast scan.
 - Products whose nutrition is declared **per serving** are now converted to
   per-100g (using the serving size) so scores stay valid, with a warning in the
   confirm form.
@@ -78,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `localStorage`, Open Food Facts lookups cached.
 - GitHub Pages deployment workflow.
 
-[Unreleased]: https://github.com/georgesblog/lemon/compare/afc3ed3...main
+[Unreleased]: https://github.com/georgesblog/lemon/compare/main...claude/basket-score-app-mgzyhh
+[0.3.0]: https://github.com/georgesblog/lemon/compare/afc3ed3...main
 [0.2.0]: https://github.com/georgesblog/lemon/compare/8e9e1eb...afc3ed3
 [0.1.0]: https://github.com/georgesblog/lemon/commits/8e9e1eb

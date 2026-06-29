@@ -1,6 +1,6 @@
 import { scoreItem, verdict, basketSummary } from '../lib/scoring.js'
 import { gbp, grams, kcal } from '../lib/format.js'
-import { ScoreBadge, NutriScore, NovaBadge } from './Bits.jsx'
+import { ScoreBadge, NutriScore, NovaBadge, DietaryBadges } from './Bits.jsx'
 
 // The home view: a ranked list of scored items plus live basket totals.
 export default function Basket({ items, weights, proteinTarget, onOpen, onRemove }) {
@@ -57,10 +57,11 @@ function ItemCard({ item, score, onOpen, onRemove }) {
             ? `${gbp(score.costPer100gProtein)} / 100g protein`
             : 'No protein value'}
         </div>
-        {(item.nutriscoreGrade || item.novaGroup) && (
-          <div className="row" style={{ gap: 6, marginTop: 6 }}>
+        {(item.nutriscoreGrade || item.novaGroup || item.additivesCount != null) && (
+          <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
             <NutriScore grade={item.nutriscoreGrade} />
             <NovaBadge group={item.novaGroup} />
+            <DietaryBadges dietary={item.dietary} additivesCount={item.additivesCount} />
           </div>
         )}
       </div>
