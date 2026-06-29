@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-29
+
 ### Added
 - **Open Prices integration** — on scan, look up crowd-sourced prices for the
   barcode (scoped to GBP) and show the typical price with a one-tap "use
@@ -24,14 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Store-internal barcode detection** — restricted-circulation barcodes (loose
   produce, deli, weighed items; GS1 prefix 2 / 02 / 04) are recognised and the
   app tells you to enter the item by hand instead of failing a pointless lookup.
-
-### Changed
-- Nutri-Score now pins to the **2023** algorithm when Open Food Facts provides
-  the per-version data, so the grade doesn't shift if OFF changes its default.
-
-## [0.3.0] - 2026-06-29
-
-### Added
 - **Hybrid barcode scanner** following Open Food Facts' smooth-app strategy of
   "use the strongest decoder the platform offers", with three tiers, best first:
   1. the browser-native **`BarcodeDetector`** (the web equivalent of smooth-app's
@@ -60,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pack size now uses Open Food Facts' numeric `product_quantity` when available
   (more reliable than parsing the free-text quantity string), falling back to
   text parsing. Pack size drives the £/100g-protein metric.
+- Nutri-Score now pins to the **2023** algorithm when Open Food Facts provides
+  the per-version data, so the grade doesn't shift if OFF changes its default.
 
 ### Fixed
 - Hard-to-read barcodes (curved tubs, blurry, low light) now decode far more
