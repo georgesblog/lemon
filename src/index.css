@@ -199,8 +199,17 @@ input, select {
   color: #fff; z-index: 2;
 }
 .scanner-hint {
-  position: absolute; bottom: calc(28px + var(--safe-bottom)); left: 0; right: 0;
+  position: absolute; bottom: calc(54px + var(--safe-bottom)); left: 0; right: 0;
   text-align: center; color: #fff; font-size: 14px; z-index: 2;
+  padding: 0 24px;
+}
+.scanner-subhint {
+  position: absolute; bottom: calc(24px + var(--safe-bottom)); left: 0; right: 0;
+  text-align: center; z-index: 2;
+}
+.linkbtn {
+  background: none; border: none; color: #fff; text-decoration: underline;
+  font-size: 13px; cursor: pointer; opacity: 0.85;
 }
 
 /* ── Compare ─────────────────────────────────────────────── */

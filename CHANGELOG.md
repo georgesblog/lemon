@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Hybrid barcode scanner** following Open Food Facts' smooth-app strategy:
+  use the browser-native `BarcodeDetector` (the web equivalent of their default
+  ML Kit engine) on Android Chrome / modern desktop Chromium, and fall back to
+  ZXing elsewhere (notably all iOS browsers and Firefox). The far-stronger
+  native path also means ZXing's ~390 kB no longer downloads on those devices.
+- **Torch / flashlight toggle** in the scanner (where the camera supports it),
+  to rescue dim and curved-surface reads.
+- Barcode normalisation mirroring smooth-app's `_fixBarcodeIfNecessary`: strip
+  separators and **pad 12-digit UPC-A to 13-digit EAN-13** (Open Food Facts
+  keys on EAN-13), with an EAN-13 check-digit guard.
 - Fetch and surface richer Open Food Facts data: **fibre** and **saturated fat**
   (editable in the confirm form, summed in basket totals), plus **Nutri-Score**
   (A–E) and **NOVA** processing-group (1–4) badges on item cards and the confirm
@@ -21,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text parsing. Pack size drives the £/100g-protein metric.
 
 ### Fixed
+- Hard-to-read barcodes (curved tubs, blurry, low light) now decode far more
+  reliably on the ZXing fallback path: `TRY_HARDER` decoding plus a 1920×1080
+  continuous-focus camera request, instead of the previous default fast scan at
+  unconstrained resolution.
 - Products whose nutrition is declared **per serving** are now converted to
   per-100g (using the serving size) so scores stay valid, with a warning in the
   confirm form.
