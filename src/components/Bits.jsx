@@ -26,6 +26,42 @@ export function NovaBadge({ group }) {
   )
 }
 
+// Dietary flags + additive count from Open Food Facts' ingredient analysis.
+// Only renders the notable, positive-or-cautionary chips to avoid clutter.
+const NEUTRAL = '#3a4252'
+export function DietaryBadges({ dietary, additivesCount }) {
+  const chips = []
+  if (dietary?.vegan === 'yes') chips.push(['Vegan', '#3a7d44'])
+  else if (dietary?.vegetarian === 'yes') chips.push(['Vegetarian', '#3a7d44'])
+  if (dietary?.palmOil === 'free') chips.push(['Palm-oil-free', '#3a7d44'])
+  else if (dietary?.palmOil === 'yes') chips.push(['Palm oil', '#c0392b'])
+  if (additivesCount != null) {
+    const color = additivesCount === 0 ? '#3a7d44' : additivesCount <= 2 ? '#b88a00' : '#c0392b'
+    chips.push([additivesCount === 0 ? 'No additives' : `${additivesCount} additive${additivesCount === 1 ? '' : 's'}`, color])
+  }
+  if (chips.length === 0) return null
+  return (
+    <>
+      {chips.map(([label, color]) => (
+        <span key={label} className="tag-badge" style={{ background: color, color: '#fff' }}>
+          {label}
+        </span>
+      ))}
+    </>
+  )
+}
+
+// Coloured chip for an Open Prices "is this a good price?" verdict.
+const PRICE_TONES = { good: '#2f8f5b', ok: '#5a6675', warn: '#b8761f', bad: '#c0392b' }
+export function PriceVerdictBadge({ verdict }) {
+  if (!verdict) return null
+  return (
+    <span className="tag-badge" style={{ background: PRICE_TONES[verdict.tone] || NEUTRAL, color: '#fff' }}>
+      {verdict.label}
+    </span>
+  )
+}
+
 // A square score badge, coloured by value, reading "X.X / 10".
 export function ScoreBadge({ score, size = 'md' }) {
   const color = scoreColor(score)

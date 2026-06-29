@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normaliseBarcode, isValidEan13 } from '../src/lib/barcode.js'
+import { normaliseBarcode, isValidEan13, isRestrictedCirculation } from '../src/lib/barcode.js'
 
 test('normaliseBarcode strips separators and whitespace', () => {
   assert.equal(normaliseBarcode('  5012345 67890-5 '), '5012345678905')
@@ -31,4 +31,16 @@ test('isValidEan13 accepts a valid check digit and rejects a bad one', () => {
 test('isValidEan13 passes through non-EAN-13 codes (EAN-8, Code-128, etc.)', () => {
   assert.equal(isValidEan13('20886616'), true) // 8-digit, not validated here
   assert.equal(isValidEan13('ABC128CODE'), true) // alphanumeric Code-128
+})
+
+test('isRestrictedCirculation flags store-internal / variable-weight barcodes', () => {
+  // GS1 prefix 2 (200–299) and 020–029 / 040–049 are in-store, never in OFF.
+  assert.equal(isRestrictedCirculation('2012345678905'), true)
+  assert.equal(isRestrictedCirculation('0212345678901'), true)
+  assert.equal(isRestrictedCirculation('0412345678907'), true)
+  assert.equal(isRestrictedCirculation('20123456'), true) // EAN-8 internal
+  // Real global retail codes are not restricted.
+  assert.equal(isRestrictedCirculation('5000159484695'), false) // UK product
+  assert.equal(isRestrictedCirculation('0036000291455'), false) // padded UPC-A
+  assert.equal(isRestrictedCirculation(null), false)
 })

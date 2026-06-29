@@ -13,6 +13,21 @@ export function normaliseBarcode(raw) {
   return code
 }
 
+// Restricted-circulation numbers (RCN): store-internal / variable-weight
+// barcodes that almost never exist in Open Food Facts. For a 13-digit EAN, GS1
+// reserves prefix 2 (200–299) and 020–029 / 040–049 for in-store use — loose
+// produce, deli counters, anything weighed and priced at the shop. (A UPC-A
+// number-system-2 code becomes "02…" once padded to EAN-13, so this catches
+// those too.) EAN-8 internal codes start with 2. We use this to tell the user
+// to skip the lookup and enter the item by hand.
+export function isRestrictedCirculation(code) {
+  if (code == null) return false
+  const c = String(code)
+  if (/^\d{13}$/.test(c)) return /^(2\d|0[24])/.test(c)
+  if (/^\d{8}$/.test(c)) return /^2/.test(c)
+  return false
+}
+
 // EAN-13 check digit. Native BarcodeDetector and ZXing both validate this
 // internally before returning, so this is a cheap belt-and-braces guard against
 // a corrupted read slipping through (e.g. from a manually typed code). Returns

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Open Prices integration** — on scan, look up crowd-sourced prices for the
+  barcode (scoped to GBP) and show the typical price with a one-tap "use
+  average", plus an "is this a good price?" verdict (Cheapest seen / Below
+  average / Typical / Above average / Pricey) once you enter a price. Best-effort
+  and hidden when there's no data.
+- **"Best protein in this category"** — an on-demand lookup (Open Food Facts
+  search) listing the highest-protein products in the scanned item's category in
+  the UK, so you can spot a better deal than the one in your hand.
+- **Dietary & processing flags** on the confirm screen and basket cards: vegan /
+  vegetarian / palm-oil-free, and an additives count — straight from Open Food
+  Facts' ingredient analysis. Allergen and "may contain" lists are shown too.
+- **Per-serving framing** — when a serving size is known, the confirm screen
+  shows protein and calories per serving alongside the per-100g figures.
+- **Store-internal barcode detection** — restricted-circulation barcodes (loose
+  produce, deli, weighed items; GS1 prefix 2 / 02 / 04) are recognised and the
+  app tells you to enter the item by hand instead of failing a pointless lookup.
+
+### Changed
+- Nutri-Score now pins to the **2023** algorithm when Open Food Facts provides
+  the per-version data, so the grade doesn't shift if OFF changes its default.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

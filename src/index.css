@@ -96,8 +96,18 @@ input, select {
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 .row { display: flex; align-items: center; gap: 10px; }
+.row.wrap { flex-wrap: wrap; }
 .spread { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .stack { display: flex; flex-direction: column; gap: 4px; }
+
+/* Small inline pill-button, e.g. "Use avg" next to the price field. */
+.chip-btn {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer;
+}
+.chip-btn:hover { border-color: var(--accent); }
+.leader-row { padding: 6px 0; border-top: 1px solid var(--border); gap: 10px; }
+.leader-row:first-of-type { border-top: none; }
 
 /* ── Score badge ─────────────────────────────────────────── */
 .score-badge {
