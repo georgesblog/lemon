@@ -4,6 +4,7 @@ import Basket from './components/Basket.jsx'
 import Compare from './components/Compare.jsx'
 import Settings from './components/Settings.jsx'
 import { fetchProduct } from './lib/openfoodfacts.js'
+import { fetchPriceInfo } from './lib/openprices.js'
 import { isRestrictedCirculation } from './lib/barcode.js'
 import { PRESETS, DEFAULT_PRESET, DEFAULT_PROTEIN_TARGET } from './lib/scoring.js'
 import { loadBasket, saveBasket, loadSettings, saveSettings, makeId } from './lib/storage.js'
@@ -21,6 +22,7 @@ export default function App() {
 
   const [view, setView] = useState('basket') // basket | compare | settings
   const [scanning, setScanning] = useState(false)
+  const [scanMode, setScanMode] = useState('single') // single | multi (rapid)
   const [editing, setEditing] = useState(null) // draft item being confirmed
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState(null)
@@ -36,32 +38,72 @@ export default function App() {
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 1800)
   }, [])
 
-  // ── Scan → fetch → confirm ──────────────────────────────────────────────
+  const startScan = useCallback((m) => {
+    setScanMode(m)
+    setScanning(true)
+  }, [])
+
+  // ── Single scan → fetch → confirm (price prefilled) ──────────────────────
   const onDetected = useCallback(
     async (barcode) => {
       setScanning(false)
       setBusy(true)
+      // Look up the community price in parallel with the product so the price
+      // suggestion is already there when the confirm screen opens.
+      const pricePromise = fetchPriceInfo(barcode).catch(() => null)
       try {
         const product = await fetchProduct(barcode)
+        const priceInfo = await pricePromise
         if (product) {
-          setEditing({ ...product, id: null, price: null })
+          setEditing({ ...product, id: null, price: null, priceInfo })
         } else if (isRestrictedCirculation(barcode)) {
           // Store-internal / variable-weight barcode — never in Open Food Facts.
           flash('Looks like a store-internal barcode — add it by hand')
-          setEditing(blankDraft(barcode))
+          setEditing({ ...blankDraft(barcode), priceInfo })
         } else {
           flash('Not in Open Food Facts — add it by hand')
-          setEditing(blankDraft(barcode))
+          setEditing({ ...blankDraft(barcode), priceInfo })
         }
       } catch {
+        const priceInfo = await pricePromise
         flash('Lookup failed — add it by hand')
-        setEditing(blankDraft(barcode))
+        setEditing({ ...blankDraft(barcode), priceInfo })
       } finally {
         setBusy(false)
       }
     },
     [flash]
   )
+
+  // ── Rapid multi-scan → add straight to the basket, price later ───────────
+  const onDetectedMulti = useCallback(
+    async (barcode) => {
+      try {
+        const product = await fetchProduct(barcode)
+        const base = product || blankDraft(barcode)
+        let added = false
+        setItems((prev) => {
+          if (prev.some((it) => it.barcode === barcode)) return prev
+          added = true
+          return [...prev, { ...base, id: makeId(), price: null }]
+        })
+        if (!added) flash('Already in basket')
+        else flash(product ? `Added ${product.name || 'item'}` : 'Added — needs details')
+      } catch {
+        setItems((prev) =>
+          prev.some((it) => it.barcode === barcode)
+            ? prev
+            : [...prev, { ...blankDraft(barcode), id: makeId() }]
+        )
+        flash('Added — lookup failed, add details later')
+      }
+    },
+    [flash]
+  )
+
+  const setItemPrice = useCallback((id, price) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, price } : it)))
+  }, [])
 
   const openManual = useCallback(() => {
     setScanning(false)
@@ -91,7 +133,8 @@ export default function App() {
     return (
       <Suspense fallback={<div className="toast">Starting camera…</div>}>
         <Scanner
-          onDetected={onDetected}
+          mode={scanMode}
+          onDetected={scanMode === 'multi' ? onDetectedMulti : onDetected}
           onClose={() => setScanning(false)}
           onManual={openManual}
         />
@@ -132,6 +175,7 @@ export default function App() {
             proteinTarget={settings.proteinTarget}
             onOpen={(item) => setEditing(item)}
             onRemove={removeItem}
+            onSetPrice={setItemPrice}
           />
         ) : view === 'compare' ? (
           <Compare items={items} weights={weights} onClose={() => setView('basket')} />
@@ -158,14 +202,15 @@ export default function App() {
               >
                 ⚖ Compare
               </button>
-              <button className="btn primary" onClick={() => setScanning(true)}>
-                📷 Scan item
+              <button className="btn ghost" onClick={() => startScan('multi')}>⚡ Rapid</button>
+              <button className="btn primary" onClick={() => startScan('single')}>
+                📷 Scan
               </button>
             </>
           ) : (
             <>
               <button className="btn ghost" onClick={() => setView('basket')}>← Basket</button>
-              <button className="btn primary" onClick={() => setScanning(true)}>📷 Scan item</button>
+              <button className="btn primary" onClick={() => startScan('single')}>📷 Scan item</button>
             </>
           )}
         </div>

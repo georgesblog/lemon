@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { scoreItem, verdict, servingMacros } from '../lib/scoring.js'
 import { fetchPriceInfo, priceVerdict } from '../lib/openprices.js'
 import { topProteinInCategory } from '../lib/offsearch.js'
@@ -26,15 +26,24 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
   const [isDairy, setIsDairy] = useState(!!draft?.isDairy)
 
   // ── Open Prices: community price for this barcode (best-effort) ────────────
-  const [priceInfo, setPriceInfo] = useState(null)
+  // The scan flow looks this up in parallel and passes it in via draft.priceInfo
+  // so it's instant; we only fetch here when it wasn't pre-loaded (e.g. editing
+  // an item from the basket).
+  const [priceInfo, setPriceInfo] = useState(draft?.priceInfo ?? null)
   useEffect(() => {
-    if (!draft?.barcode) return
+    if (!draft?.barcode || draft?.priceInfo) return
     const ctrl = new AbortController()
     fetchPriceInfo(draft.barcode, { signal: ctrl.signal })
       .then((info) => setPriceInfo(info))
       .catch(() => {})
     return () => ctrl.abort()
-  }, [draft?.barcode])
+  }, [draft?.barcode, draft?.priceInfo])
+
+  // Land the cursor on the price field after a scan, so pricing is one tap away.
+  const priceRef = useRef(null)
+  useEffect(() => {
+    if (!draft?.id) priceRef.current?.focus()
+  }, [draft?.id])
 
   const candidate = useMemo(
     // ...draft carries through OFF-derived extras (novaGroup, nutriscoreGrade,
@@ -134,6 +143,7 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
           <div className="with-prefix">
             <span className="prefix">£</span>
             <input
+              ref={priceRef}
               type="number" inputMode="decimal" step="0.01" min="0"
               value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00"
             />

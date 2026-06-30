@@ -1,9 +1,12 @@
-import { scoreItem, verdict, basketSummary } from '../lib/scoring.js'
+import { useEffect, useState } from 'react'
+import { scoreItem, verdict, basketSummary, needsPrice } from '../lib/scoring.js'
+import { fetchPriceInfo } from '../lib/openprices.js'
 import { gbp, grams, kcal } from '../lib/format.js'
 import { ScoreBadge, NutriScore, NovaBadge, DietaryBadges } from './Bits.jsx'
 
-// The home view: a ranked list of scored items plus live basket totals.
-export default function Basket({ items, weights, proteinTarget, onOpen, onRemove }) {
+// The home view: a "needs price" tray for freshly-scanned items, then a ranked
+// list of priced items plus live basket totals.
+export default function Basket({ items, weights, proteinTarget, onOpen, onRemove, onSetPrice }) {
   if (items.length === 0) {
     return (
       <div className="empty">
@@ -16,19 +19,25 @@ export default function Basket({ items, weights, proteinTarget, onOpen, onRemove
     )
   }
 
-  const summary = basketSummary(items, weights, proteinTarget)
+  const needs = items.filter(needsPrice)
+  const priced = items.filter((it) => !needsPrice(it))
+  const summary = basketSummary(priced, weights, proteinTarget)
 
-  // Rank items best-first so the strongest buys float to the top.
-  const ranked = items
+  // Rank priced items best-first so the strongest buys float to the top.
+  const ranked = priced
     .map((item) => ({ item, score: scoreItem(item, weights) }))
     .sort((a, b) => b.score.composite - a.score.composite)
 
   return (
     <div>
-      <BasketSummary summary={summary} />
-      <div className="muted small" style={{ margin: '4px 2px 8px' }}>
-        {items.length} item{items.length === 1 ? '' : 's'} · best value first
-      </div>
+      <NeedsPriceTray items={needs} onSetPrice={onSetPrice} onOpen={onOpen} onRemove={onRemove} />
+
+      {priced.length > 0 && <BasketSummary summary={summary} />}
+      {priced.length > 0 && (
+        <div className="muted small" style={{ margin: '4px 2px 8px' }}>
+          {priced.length} priced item{priced.length === 1 ? '' : 's'} · best value first
+        </div>
+      )}
       {ranked.map(({ item, score }) => (
         <ItemCard
           key={item.id}
@@ -38,6 +47,78 @@ export default function Basket({ items, weights, proteinTarget, onOpen, onRemove
           onRemove={() => onRemove(item.id)}
         />
       ))}
+    </div>
+  )
+}
+
+// Quick-entry list for items scanned without a price yet. Each row offers an
+// inline £ box and, where Open Prices has data, a one-tap community average.
+function NeedsPriceTray({ items, onSetPrice, onOpen, onRemove }) {
+  if (items.length === 0) return null
+  return (
+    <div className="card needs-price">
+      <div className="spread" style={{ marginBottom: 8 }}>
+        <span style={{ fontWeight: 700 }}>Needs price</span>
+        <span className="pill">{items.length}</span>
+      </div>
+      {items.map((item) => (
+        <PriceRow
+          key={item.id}
+          item={item}
+          onSetPrice={onSetPrice}
+          onOpen={() => onOpen(item)}
+          onRemove={() => onRemove(item.id)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function PriceRow({ item, onSetPrice, onOpen, onRemove }) {
+  const [val, setVal] = useState('')
+  const [info, setInfo] = useState(null)
+
+  useEffect(() => {
+    if (!item.barcode) return
+    const ctrl = new AbortController()
+    fetchPriceInfo(item.barcode, { signal: ctrl.signal })
+      .then((i) => setInfo(i))
+      .catch(() => {})
+    return () => ctrl.abort()
+  }, [item.barcode])
+
+  const commit = (v) => {
+    const p = parseFloat(v)
+    if (Number.isFinite(p) && p > 0) onSetPrice(item.id, p)
+  }
+
+  return (
+    <div className="price-row">
+      <div className="price-row-main">
+        <div className="small" style={{ fontWeight: 600, cursor: 'pointer' }} onClick={onOpen}>
+          {item.name || 'Unnamed item — tap to edit'}
+        </div>
+        {info && info.count > 0 && (
+          <button
+            type="button"
+            className="chip-btn"
+            onClick={() => { const v = info.avg.toFixed(2); setVal(v); commit(v) }}
+          >
+            avg {gbp(info.avg)} · use
+          </button>
+        )}
+      </div>
+      <div className="with-prefix price-row-input">
+        <span className="prefix">£</span>
+        <input
+          type="number" inputMode="decimal" step="0.01" min="0"
+          value={val} placeholder="0.00"
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit(e.target.value) }}
+        />
+      </div>
+      <button className="iconbtn" onClick={onRemove} aria-label="Remove item">✕</button>
     </div>
   )
 }
