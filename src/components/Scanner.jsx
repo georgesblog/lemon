@@ -66,14 +66,18 @@ async function ensureWasm() {
   return wasmReadyPromise
 }
 
-export default function Scanner({ onDetected, onClose, onManual }) {
+export default function Scanner({ onDetected, onClose, onManual, mode = 'single' }) {
+  const multi = mode === 'multi' // rapid mode: add instantly, keep the camera open
   const videoRef = useRef(null)
   const firedRef = useRef(false)
   const teardownRef = useRef(() => {})
   const trackRef = useRef(null)
+  const addedRef = useRef(new Set()) // barcodes already added this session (multi)
+  const cooldownRef = useRef(0) // brief pause between rapid adds
 
   const [error, setError] = useState(null)
   const [engine, setEngine] = useState(null) // 'native' | 'wasm' | 'zxing'
+  const [count, setCount] = useState(0) // items added so far in rapid mode
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
 
@@ -95,9 +99,20 @@ export default function Scanner({ onDetected, onClose, onManual }) {
     let stream = null
 
     const fire = (raw) => {
-      if (firedRef.current) return
       const code = normaliseBarcode(raw)
       if (!code || !isValidEan13(code)) return
+      if (multi) {
+        // Rapid mode: add it, keep scanning. De-dupe within the session and
+        // pause briefly so one barcode in view isn't read over and over.
+        if (Date.now() < cooldownRef.current || addedRef.current.has(code)) return
+        addedRef.current.add(code)
+        cooldownRef.current = Date.now() + 900
+        try { navigator.vibrate?.(50) } catch { /* no-op */ }
+        setCount((c) => c + 1)
+        onDetected(code)
+        return
+      }
+      if (firedRef.current) return
       firedRef.current = true
       try { navigator.vibrate?.(60) } catch { /* no-op */ }
       teardownRef.current()
@@ -119,7 +134,9 @@ export default function Scanner({ onDetected, onClose, onManual }) {
         if (cancelled || firedRef.current) return
         try {
           const code = await detect()
-          if (code) { fire(code); return }
+          // In rapid mode fire() keeps the loop alive; in single mode it tears
+          // the camera down, so stop scheduling.
+          if (code) { fire(code); if (!multi) return }
         } catch { /* transient decode error — keep going */ }
         if (!cancelled && !firedRef.current) rafId = requestAnimationFrame(tick)
       }
@@ -226,7 +243,7 @@ export default function Scanner({ onDetected, onClose, onManual }) {
       cancelled = true
       teardownRef.current()
     }
-  }, [onDetected])
+  }, [onDetected, multi])
 
   return (
     <div className="scanner-wrap">
@@ -237,7 +254,7 @@ export default function Scanner({ onDetected, onClose, onManual }) {
 
       <div className="scanner-topbar">
         <button className="iconbtn" onClick={onClose} aria-label="Close scanner">✕</button>
-        <span className="pill">Scan a barcode</span>
+        <span className="pill">{multi ? `Rapid scan · ${count} added` : 'Scan a barcode'}</span>
         {torchAvailable ? (
           <button
             className="btn ghost"
@@ -257,13 +274,23 @@ export default function Scanner({ onDetected, onClose, onManual }) {
       <div className="scanner-hint">
         {error
           ? error
-          : 'Line up the barcode inside the frame. For round tubs, rotate slowly so the bars flatten.'}
+          : multi
+            ? 'Items add automatically as you scan. Price them after — tap Done when finished.'
+            : 'Line up the barcode inside the frame. For round tubs, rotate slowly so the bars flatten.'}
       </div>
 
-      {!error && torchAvailable && (
-        <div className="scanner-subhint">
-          <button className="linkbtn" onClick={onManual}>Enter barcode manually</button>
+      {multi ? (
+        <div className="scanner-donebar">
+          <button className="btn primary block" onClick={onClose}>
+            Done{count > 0 ? ` · ${count} added` : ''}
+          </button>
         </div>
+      ) : (
+        !error && torchAvailable && (
+          <div className="scanner-subhint">
+            <button className="linkbtn" onClick={onManual}>Enter barcode manually</button>
+          </div>
+        )
       )}
     </div>
   )

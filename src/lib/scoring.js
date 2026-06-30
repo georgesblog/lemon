@@ -127,6 +127,12 @@ export function packTotals(item) {
   }
 }
 
+// An item is "unpriced" until it has a positive price. Rapid multi-scan adds
+// items without a price, and the basket gathers these into a "needs price" tray.
+export function needsPrice(item) {
+  return !Number.isFinite(+item?.price) || +item.price <= 0
+}
+
 // Per-serving macros from per-100g nutrition + a serving size in grams. Lets
 // the UI frame protein bars / shakes "per scoop" the way the label does.
 // Returns null when there's no serving size to scale by.

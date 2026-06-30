@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Rapid multi-scan mode** (⚡ Rapid) — scan many items in a row without
+  stopping; each is added to the basket from its Open Food Facts data the moment
+  it's read, the camera stays open, and a counter tracks the haul. Built for
+  banking a shelf of items fast and pricing them afterwards.
+- **"Needs price" tray** at the top of the basket — items scanned without a
+  price gather here with an inline £ box (and a one-tap community average from
+  Open Prices where available). Enter a price and the item drops into the ranked
+  list. The basket score and totals are computed from priced items only.
+
+### Changed
+- A single scan now **looks up the Open Prices community price in parallel** with
+  the product, and **auto-focuses the price field**, so you land one tap from
+  entering the price with the suggestion already showing.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

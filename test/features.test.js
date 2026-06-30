@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { parseDietary, tagLabels } from '../src/lib/openfoodfacts.js'
 import { aggregate, priceVerdict } from '../src/lib/openprices.js'
 import { buildSearchUrl } from '../src/lib/offsearch.js'
-import { servingMacros } from '../src/lib/scoring.js'
+import { servingMacros, needsPrice } from '../src/lib/scoring.js'
 
 // ── Dietary flags (#3) ───────────────────────────────────────────────────────
 test('parseDietary collapses OFF analysis tags to simple statuses', () => {
@@ -50,6 +50,14 @@ test('buildSearchUrl sorts by protein, scopes to category + country', () => {
   assert.match(qs.get('q'), /categories_tags:"en:yogurts"/)
   assert.match(qs.get('q'), /countries_tags:"en:united-kingdom"/)
   assert.match(qs.get('q'), /proteins_100g:\[1 TO \*\]/)
+})
+
+// ── Rapid multi-scan: needs-price gating ─────────────────────────────────────
+test('needsPrice flags items with no/zero price', () => {
+  assert.equal(needsPrice({ price: null }), true)
+  assert.equal(needsPrice({ price: 0 }), true)
+  assert.equal(needsPrice({}), true)
+  assert.equal(needsPrice({ price: 2.49 }), false)
 })
 
 // ── Per-serving framing (#5) ─────────────────────────────────────────────────
