@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { scoreItem, verdict, servingMacros } from '../lib/scoring.js'
 import { fetchPriceInfo, priceVerdict } from '../lib/openprices.js'
 import { topProteinInCategory } from '../lib/offsearch.js'
@@ -39,11 +39,20 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
     return () => ctrl.abort()
   }, [draft?.barcode, draft?.priceInfo])
 
-  // Land the cursor on the price field after a scan, so pricing is one tap away.
-  const priceRef = useRef(null)
-  useEffect(() => {
-    if (!draft?.id) priceRef.current?.focus()
-  }, [draft?.id])
+  // Our own number pad drives the price. iOS won't auto-raise the system
+  // keyboard after a camera scan (no user gesture), so a built-in pad is the
+  // only way to make pricing zero-tap. Open it immediately on a fresh scan.
+  const [padOpen, setPadOpen] = useState(!draft?.id)
+  const pressKey = (k) => {
+    setPrice((cur) => {
+      if (k === 'back') return cur.slice(0, -1)
+      if (k === '.') return cur.includes('.') ? cur : `${cur || '0'}.`
+      if (!/^[0-9]$/.test(k)) return cur
+      // cap at two decimal places
+      if (cur.includes('.') && cur.split('.')[1].length >= 2) return cur
+      return cur + k
+    })
+  }
 
   const candidate = useMemo(
     // ...draft carries through OFF-derived extras (novaGroup, nutriscoreGrade,
@@ -143,9 +152,15 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
           <div className="with-prefix">
             <span className="prefix">£</span>
             <input
-              ref={priceRef}
-              type="number" inputMode="decimal" step="0.01" min="0"
-              value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00"
+              type="text" inputMode="none" readOnly
+              className={padOpen ? 'price-active' : undefined}
+              value={price} placeholder="0.00"
+              onClick={() => setPadOpen(true)}
+              onKeyDown={(e) => {
+                // physical keyboard support (desktop) on the read-only field
+                if (e.key === 'Backspace') { pressKey('back'); e.preventDefault() }
+                else if (e.key === '.' || /^[0-9]$/.test(e.key)) { pressKey(e.key); e.preventDefault() }
+              }}
             />
           </div>
         </div>
@@ -170,6 +185,8 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
           <PriceVerdictBadge verdict={pVerdict} />
         </div>
       )}
+
+      {padOpen && <NumPad onKey={pressKey} />}
 
       <div className="sep" />
       <div className="spread" style={{ marginBottom: 8 }}>
@@ -265,6 +282,28 @@ function CategoryLeaders({ categoryTag, currentBarcode }) {
             <span className="small" style={{ fontWeight: 700 }}>{grams(r.protein)}/100g</span>
           </span>
         </div>
+      ))}
+    </div>
+  )
+}
+
+// In-app numeric keypad for the price. Shown immediately on a fresh scan so
+// you can start entering the price with zero taps — the system keyboard can't
+// auto-open on iOS after a camera scan.
+const PAD_KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '.', '0', 'back']
+function NumPad({ onKey }) {
+  return (
+    <div className="numpad" role="group" aria-label="Price keypad">
+      {PAD_KEYS.map((k) => (
+        <button
+          key={k}
+          type="button"
+          className="numpad-key"
+          onClick={() => onKey(k)}
+          aria-label={k === 'back' ? 'Delete' : k}
+        >
+          {k === 'back' ? '⌫' : k}
+        </button>
       ))}
     </div>
   )

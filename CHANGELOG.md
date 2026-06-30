@@ -16,11 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   price gather here with an inline £ box (and a one-tap community average from
   Open Prices where available). Enter a price and the item drops into the ranked
   list. The basket score and totals are computed from priced items only.
+- **Built-in number pad for the price** — opens automatically on a fresh scan so
+  you can start typing the price with zero taps. iOS won't raise its own keyboard
+  after a camera scan (it needs a user tap), so an in-app pad is the only way to
+  make pricing truly tap-free; it also caps at two decimals and works one-handed.
 
 ### Changed
 - A single scan now **looks up the Open Prices community price in parallel** with
-  the product, and **auto-focuses the price field**, so you land one tap from
-  entering the price with the suggestion already showing.
+  the product lookup, so the price suggestion is showing the instant the confirm
+  screen opens.
 
 ## [0.3.0] - 2026-06-29
 

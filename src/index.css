@@ -240,6 +240,20 @@ input, select {
 }
 .price-row-input { width: 92px; flex: none; }
 
+/* In-app price keypad */
+.price-active { outline: 2px solid var(--accent); outline-offset: -1px; }
+.numpad {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin: 0 0 4px;
+}
+.numpad-key {
+  padding: 15px 0; font-size: 21px; font-weight: 600;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; color: var(--text); cursor: pointer;
+  -webkit-user-select: none; user-select: none; touch-action: manipulation;
+}
+.numpad-key:active { background: var(--accent); color: #0f1115; }
+
 /* ── Compare ─────────────────────────────────────────────── */
 .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .compare-col { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
