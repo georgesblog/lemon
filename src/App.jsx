@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useState, useCallback, useRef, lazy, Suspense } from 'react'
 import ItemForm from './components/ItemForm.jsx'
 import Basket from './components/Basket.jsx'
 import Compare from './components/Compare.jsx'
@@ -29,8 +29,15 @@ export default function App() {
 
   const weights = (PRESETS[settings.preset] || PRESETS[DEFAULT_PRESET]).weights
 
+  // A synchronous mirror of `items` so rapid multi-scan can de-dupe against the
+  // current basket immediately, without waiting for a re-render.
+  const itemsRef = useRef(items)
+
   // Persist on change.
-  useEffect(() => saveBasket(items), [items])
+  useEffect(() => {
+    itemsRef.current = items
+    saveBasket(items)
+  }, [items])
   useEffect(() => saveSettings(settings), [settings])
 
   const flash = useCallback((msg) => {
@@ -78,23 +85,23 @@ export default function App() {
   // ── Rapid multi-scan → add straight to the basket, price later ───────────
   const onDetectedMulti = useCallback(
     async (barcode) => {
+      // Never add the same barcode twice.
+      if (itemsRef.current.some((it) => it.barcode === barcode)) {
+        flash('Already scanned — skipped')
+        return
+      }
       try {
         const product = await fetchProduct(barcode)
-        const base = product || blankDraft(barcode)
-        let added = false
-        setItems((prev) => {
-          if (prev.some((it) => it.barcode === barcode)) return prev
-          added = true
-          return [...prev, { ...base, id: makeId(), price: null }]
-        })
-        if (!added) flash('Already in basket')
-        else flash(product ? `Added ${product.name || 'item'}` : 'Added — needs details')
+        // Re-check after the lookup in case it was added meanwhile.
+        if (itemsRef.current.some((it) => it.barcode === barcode)) return
+        const item = { ...(product || blankDraft(barcode)), id: makeId(), price: null }
+        itemsRef.current = [...itemsRef.current, item] // keep the mirror current now
+        setItems((prev) => [...prev, item])
+        flash(product ? `Added ${product.name || 'item'}` : 'Added — needs details')
       } catch {
-        setItems((prev) =>
-          prev.some((it) => it.barcode === barcode)
-            ? prev
-            : [...prev, { ...blankDraft(barcode), id: makeId() }]
-        )
+        const item = { ...blankDraft(barcode), id: makeId() }
+        itemsRef.current = [...itemsRef.current, item]
+        setItems((prev) => [...prev, item])
         flash('Added — lookup failed, add details later')
       }
     },

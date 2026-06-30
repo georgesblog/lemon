@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the product lookup, so the price suggestion is showing the instant the confirm
   screen opens.
 
+### Fixed
+- **Rapid multi-scan duplicate handling.** A stale-closure bug made every rapid
+  add flash "Already in basket" even for new items; de-duplication now uses a
+  synchronous basket check so the same barcode is reliably skipped. The scanner
+  also shows a clear **"✓ Added" / "Already scanned"** banner (with distinct
+  haptics) so each scan visibly registers instead of being silently ignored.
+
 ## [0.3.0] - 2026-06-29
 
 ### Added

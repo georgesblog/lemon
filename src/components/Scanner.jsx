@@ -74,10 +74,12 @@ export default function Scanner({ onDetected, onClose, onManual, mode = 'single'
   const trackRef = useRef(null)
   const addedRef = useRef(new Set()) // barcodes already added this session (multi)
   const cooldownRef = useRef(0) // brief pause between rapid adds
+  const dupCooldownRef = useRef(0) // throttle the "already scanned" notice
 
   const [error, setError] = useState(null)
   const [engine, setEngine] = useState(null) // 'native' | 'wasm' | 'zxing'
   const [count, setCount] = useState(0) // items added so far in rapid mode
+  const [notice, setNotice] = useState(null) // 'added' | 'dup' transient banner
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
 
@@ -97,18 +99,36 @@ export default function Scanner({ onDetected, onClose, onManual, mode = 'single'
     let cancelled = false
     let rafId = null
     let stream = null
+    let noticeTimer = null
+
+    // Transient on-screen confirmation so each scan visibly registers (and a
+    // duplicate is acknowledged rather than silently ignored).
+    const showNotice = (kind) => {
+      setNotice(kind)
+      if (noticeTimer) clearTimeout(noticeTimer)
+      noticeTimer = setTimeout(() => setNotice(null), 1100)
+    }
 
     const fire = (raw) => {
       const code = normaliseBarcode(raw)
       if (!code || !isValidEan13(code)) return
       if (multi) {
-        // Rapid mode: add it, keep scanning. De-dupe within the session and
-        // pause briefly so one barcode in view isn't read over and over.
-        if (Date.now() < cooldownRef.current || addedRef.current.has(code)) return
+        // Already captured this session: acknowledge it, don't add again.
+        if (addedRef.current.has(code)) {
+          if (Date.now() > dupCooldownRef.current) {
+            dupCooldownRef.current = Date.now() + 1500
+            try { navigator.vibrate?.([25, 40, 25]) } catch { /* no-op */ }
+            showNotice('dup')
+          }
+          return
+        }
+        // Brief pause so two items in frame aren't both grabbed instantly.
+        if (Date.now() < cooldownRef.current) return
         addedRef.current.add(code)
         cooldownRef.current = Date.now() + 900
         try { navigator.vibrate?.(50) } catch { /* no-op */ }
         setCount((c) => c + 1)
+        showNotice('added')
         onDetected(code)
         return
       }
@@ -241,6 +261,7 @@ export default function Scanner({ onDetected, onClose, onManual, mode = 'single'
     start()
     return () => {
       cancelled = true
+      if (noticeTimer) clearTimeout(noticeTimer)
       teardownRef.current()
     }
   }, [onDetected, multi])
@@ -251,6 +272,12 @@ export default function Scanner({ onDetected, onClose, onManual, mode = 'single'
       <div className="scanner-overlay">
         <div className="scan-reticle" />
       </div>
+
+      {multi && notice && (
+        <div className={`scan-notice scan-notice-${notice}`}>
+          {notice === 'added' ? '✓ Added' : '• Already scanned'}
+        </div>
+      )}
 
       <div className="scanner-topbar">
         <button className="iconbtn" onClick={onClose} aria-label="Close scanner">✕</button>

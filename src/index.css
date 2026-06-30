@@ -226,6 +226,18 @@ input, select {
   padding: 12px 16px calc(16px + var(--safe-bottom));
   background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
 }
+.scan-notice {
+  position: absolute; left: 50%; top: 16%; transform: translateX(-50%);
+  z-index: 4; padding: 8px 16px; border-radius: 999px;
+  font-weight: 700; font-size: 15px; color: #fff; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35); animation: notice-pop 150ms ease-out;
+}
+.scan-notice-added { background: #2f8f5b; }
+.scan-notice-dup { background: #b8761f; }
+@keyframes notice-pop {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 
 /* Needs-price tray + inline rows */
 .needs-price { border-color: var(--accent); }
