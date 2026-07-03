@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { scoreItem, verdict, servingMacros } from '../lib/scoring.js'
+import { scoreItem, verdict, servingMacros, nutritionConfidence } from '../lib/scoring.js'
 import { fetchPriceInfo, priceVerdict } from '../lib/openprices.js'
-import { topProteinInCategory } from '../lib/offsearch.js'
+import { topProteinInCategory, betterProteinPicks } from '../lib/offsearch.js'
 import { gbp, grams, kcal } from '../lib/format.js'
 import { ScoreBadge, MetricBar, NutriScore, NovaBadge, DietaryBadges, PriceVerdictBadge } from './Bits.jsx'
 
@@ -79,6 +79,7 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
   )
 
   const score = useMemo(() => scoreItem(candidate, weights), [candidate, weights])
+  const confidence = useMemo(() => nutritionConfidence(candidate), [candidate])
   const pVerdict = priceVerdict(price, priceInfo)
   const perServing = useMemo(
     () => servingMacros(candidate.nutriments, draft?.servingQuantity),
@@ -113,6 +114,10 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         </div>
         <ScoreBadge score={score.composite} size="lg" />
       </div>
+
+      {/* Trust signal: how solid the numbers behind the score are. Stays quiet
+          on a blank form (nothing to trust yet). */}
+      {(score.composite > 0 || confidence.perServing) && <ConfidenceHint confidence={confidence} />}
 
       {/* Open Food Facts context badges: health grade, processing, diet flags */}
       {(draft?.nutriscoreGrade || draft?.novaGroup || hasDietary(draft)) && (
@@ -227,7 +232,13 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
         <MetricBar label="Sugar-to-carb quality" score={score.subScores.sugarCarb} />
       </div>
 
-      {draft?.categoryTag && <CategoryLeaders categoryTag={draft.categoryTag} currentBarcode={draft.barcode} />}
+      {draft?.categoryTag && (
+        <BetterPicks
+          categoryTag={draft.categoryTag}
+          currentBarcode={draft.barcode}
+          currentProtein={parseFloat(proteins)}
+        />
+      )}
 
       <div className="actionbar">
         <button className="btn ghost" onClick={onCancel}>Cancel</button>
@@ -239,50 +250,88 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
   )
 }
 
-// "Best protein in this category" — pulls the top-protein products in the same
-// Open Food Facts category (UK), on demand. Best-effort: hides itself if the
-// search returns nothing.
-function CategoryLeaders({ categoryTag, currentBarcode }) {
-  const [state, setState] = useState('idle') // idle | loading | done
+// "Better pick" — automatically surfaces higher-protein alternatives in the
+// same Open Food Facts category (UK) the moment the confirm screen opens, so a
+// better option is offered without the user going looking. Best-effort: it
+// loads quietly and hides itself entirely if the search returns nothing
+// (CORS/empty/offline), never blocking the confirm flow. Comparison is on
+// protein density — the leaders carry no price, so this is framed as nutrition,
+// not value.
+function BetterPicks({ categoryTag, currentBarcode, currentProtein }) {
+  const [state, setState] = useState('loading') // loading | done
   const [rows, setRows] = useState([])
   const label = categoryTag.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ')
 
-  const load = () => {
-    setState('loading')
-    topProteinInCategory(categoryTag)
-      .then((r) => { setRows(r); setState('done') })
-      .catch(() => { setRows([]); setState('done') })
-  }
+  useEffect(() => {
+    let live = true
+    const ctrl = new AbortController()
+    topProteinInCategory(categoryTag, { signal: ctrl.signal })
+      .then((r) => { if (live) { setRows(r); setState('done') } })
+      .catch(() => { if (live) { setRows([]); setState('done') } })
+    return () => { live = false; ctrl.abort() }
+  }, [categoryTag])
 
-  if (state === 'idle') {
+  // Nothing to show yet, or nothing came back — stay out of the way.
+  if (state === 'loading') return null
+  if (rows.length === 0) return null
+
+  const base = Number.isFinite(+currentProtein) ? +currentProtein : 0
+  const picks = betterProteinPicks(rows, { currentProtein: base, currentBarcode })
+
+  // The scanned item is already at/near the top of its category — reassure
+  // rather than nag.
+  if (picks.length === 0) {
     return (
-      <button type="button" className="btn ghost" style={{ width: '100%', marginTop: 12 }} onClick={load}>
-        🏆 Best protein in “{label}”
-      </button>
+      <div className="card small" style={{ marginTop: 12, borderColor: 'var(--accent-dim)' }}>
+        ✅ Strong protein pick for “{label}” — little in this category beats it.
+      </div>
     )
   }
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
-      <div className="muted small" style={{ marginBottom: 8 }}>
-        Highest protein in “{label}” (UK)
+    <div className="card" style={{ marginTop: 12, borderColor: 'var(--accent)' }}>
+      <div className="spread" style={{ marginBottom: 8 }}>
+        <span style={{ fontWeight: 700 }}>Better pick in “{label}”</span>
+        {base > 0 && <span className="pill">this: {grams(base)}/100g</span>}
       </div>
-      {state === 'loading' && <div className="muted small">Searching…</div>}
-      {state === 'done' && rows.length === 0 && (
-        <div className="muted small">No category data available right now.</div>
-      )}
-      {rows.map((r, i) => (
-        <div key={r.code || i} className="spread leader-row">
-          <span className="small" style={{ fontWeight: r.code === currentBarcode ? 700 : 400 }}>
-            {i + 1}. {r.name}{r.brand ? <span className="muted"> · {r.brand}</span> : null}
-            {r.code === currentBarcode ? <span className="muted"> · this item</span> : null}
-          </span>
-          <span className="row" style={{ gap: 6 }}>
-            <NutriScore grade={r.nutriscore} />
-            <span className="small" style={{ fontWeight: 700 }}>{grams(r.protein)}/100g</span>
-          </span>
-        </div>
-      ))}
+      {picks.map((r, i) => {
+        const per100kcal = r.kcal > 0 ? (r.protein / r.kcal) * 100 : null
+        return (
+          <div key={r.code || i} className="spread leader-row">
+            <span className="small">
+              {r.name}{r.brand ? <span className="muted"> · {r.brand}</span> : null}
+              {per100kcal != null && (
+                <span className="muted"> · {per100kcal.toFixed(1)}g/100kcal</span>
+              )}
+            </span>
+            <span className="row" style={{ gap: 6 }}>
+              <NutriScore grade={r.nutriscore} />
+              <span className="small" style={{ fontWeight: 700, color: 'var(--good)' }}>
+                {grams(r.protein)}/100g
+              </span>
+            </span>
+          </div>
+        )
+      })}
+      <div className="muted small" style={{ marginTop: 8 }}>
+        Higher protein per 100g in the UK Open Food Facts data — check the price to compare value.
+      </div>
+    </div>
+  )
+}
+
+// Small, honest confidence line under the live score: the score is only as good
+// as the numbers behind it. Silent when everything needed is present.
+function ConfidenceHint({ confidence }) {
+  if (!confidence || confidence.level === 'ok') return null
+  const { level, missing, perServing } = confidence
+  const parts = []
+  if (perServing) parts.push('converted from per-serving label data')
+  if (missing.length) parts.push(`missing ${missing.join(', ')}`)
+  const tone = level === 'low' ? 'var(--bad)' : 'var(--warn)'
+  return (
+    <div className="small" style={{ margin: '-4px 2px 12px', color: tone }}>
+      {level === 'low' ? '⚠️ Low-confidence score' : 'ℹ️ Estimated score'} — {parts.join('; ')}. Edit the fields below to fix it.
     </div>
   )
 }

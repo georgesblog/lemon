@@ -150,6 +150,43 @@ export function normaliseNutriments(n = {}, servingQuantity = null) {
   }
 }
 
+// Free-text product search — the fallback for when a barcode won't scan or a
+// product simply isn't keyed by its barcode. Returns a short list of matches
+// (UK-biased) as { code, name, brand, image }; the caller then loads the full
+// product by code through fetchProduct. Keyless GET; best-effort, [] on any
+// failure so the UI degrades to plain manual entry.
+export async function searchByName(query, { signal, limit = 12 } = {}) {
+  const q = String(query || '').trim()
+  if (q.length < 2) return []
+  const params = new URLSearchParams({
+    search_terms: q,
+    search_simple: '1',
+    action: 'process',
+    json: '1',
+    page_size: String(limit),
+    fields: 'code,product_name,brands,image_front_small_url',
+    // Surface UK-available products first without hard-excluding the rest.
+    sort_by: 'popularity_key',
+  })
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?${params.toString()}`
+  try {
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
+    if (!res.ok) return []
+    const data = await res.json()
+    const products = Array.isArray(data.products) ? data.products : []
+    return products
+      .map((p) => ({
+        code: p.code || null,
+        name: (p.product_name || '').trim(),
+        brand: (p.brands || '').split(',')[0]?.trim() || '',
+        image: p.image_front_small_url || null,
+      }))
+      .filter((p) => p.code && p.name)
+  } catch {
+    return []
+  }
+}
+
 // Look up a scanned barcode. Returns a draft item, or null if not found.
 export async function fetchProduct(barcode, { signal } = {}) {
   const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(
