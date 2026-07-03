@@ -2,7 +2,7 @@ import { PRESETS } from '../lib/scoring.js'
 
 // Tune the scoring to your goal. Presets shift the weighting between value and
 // protein quality; the protein target drives the "cost per day" basket figure.
-export default function Settings({ preset, proteinTarget, onChangePreset, onChangeTarget, onClose }) {
+export default function Settings({ preset, proteinTarget, store, onChangePreset, onChangeTarget, onChangeStore, onClose }) {
   return (
     <div>
       <div className="field">
@@ -38,6 +38,16 @@ export default function Settings({ preset, proteinTarget, onChangePreset, onChan
         <div className="muted small">
           Drives the basket's “cost per day to hit your protein” figure.
         </div>
+      </div>
+
+      <div className="field">
+        <label>Usual store (optional)</label>
+        <input
+          value={store || ''}
+          onChange={(e) => onChangeStore(e.target.value)}
+          placeholder="e.g. Aldi"
+        />
+        <div className="muted small">Remembered for your shops — no account needed.</div>
       </div>
 
       <div className="actionbar">

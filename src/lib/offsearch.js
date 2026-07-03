@@ -29,7 +29,7 @@ export function buildSearchUrl(categoryTag, { country = 'en:united-kingdom', lim
   return `${BASE}?${params.toString()}`
 }
 
-// Returns [{ code, name, brand, protein, nutriscore }] sorted high→low, or [].
+// Returns [{ code, name, brand, protein, kcal, nutriscore }] sorted high→low, or [].
 export async function topProteinInCategory(categoryTag, opts = {}) {
   if (!categoryTag) return []
   try {
@@ -46,6 +46,7 @@ export async function topProteinInCategory(categoryTag, opts = {}) {
         name: (h.product_name || '').trim() || 'Unnamed product',
         brand: (h.brands || '').split(',')[0]?.trim() || '',
         protein: num(h?.nutriments?.proteins_100g),
+        kcal: num(h?.nutriments?.['energy-kcal_100g']),
         nutriscore: h.nutriscore_grade && /^[a-e]$/i.test(h.nutriscore_grade)
           ? String(h.nutriscore_grade).toUpperCase()
           : null,
@@ -54,4 +55,18 @@ export async function topProteinInCategory(categoryTag, opts = {}) {
   } catch {
     return []
   }
+}
+
+// From a set of category leaders, pick the higher-protein alternatives to the
+// item in hand — i.e. products with meaningfully more protein per 100g than
+// what was scanned. Excludes the scanned item itself. Returns the strongest
+// first, capped to `top`. Pure + testable; the network lives in
+// topProteinInCategory. `currentProtein` is the scanned item's protein_100g;
+// pass 0/null when unknown (then every leader counts as an alternative).
+export function betterProteinPicks(rows, { currentProtein = 0, currentBarcode = null, margin = 2, top = 3 } = {}) {
+  const base = num(currentProtein)
+  return (rows || [])
+    .filter((r) => r.code !== currentBarcode)
+    .filter((r) => num(r.protein) >= base + margin)
+    .slice(0, top)
 }

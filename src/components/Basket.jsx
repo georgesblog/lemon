@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { scoreItem, verdict, basketSummary, needsPrice } from '../lib/scoring.js'
+import { scoreItem, verdict, basketSummary, needsPrice, nutritionConfidence } from '../lib/scoring.js'
 import { fetchPriceInfo } from '../lib/openprices.js'
 import { gbp, grams, kcal } from '../lib/format.js'
 import { ScoreBadge, NutriScore, NovaBadge, DietaryBadges } from './Bits.jsx'
 
 // The home view: a "needs price" tray for freshly-scanned items, then a ranked
 // list of priced items plus live basket totals.
-export default function Basket({ items, weights, proteinTarget, onOpen, onRemove, onSetPrice }) {
+export default function Basket({ items, weights, proteinTarget, onOpen, onRemove, onSetPrice, onSearch }) {
   if (items.length === 0) {
     return (
       <div className="empty">
@@ -15,6 +15,11 @@ export default function Basket({ items, weights, proteinTarget, onOpen, onRemove
           Your basket is empty
         </div>
         <div>Scan an item to price it and start scoring.</div>
+        {onSearch && (
+          <button className="btn ghost" style={{ marginTop: 16 }} onClick={onSearch}>
+            🔎 Search by name instead
+          </button>
+        )}
       </div>
     )
   }
@@ -124,6 +129,7 @@ function PriceRow({ item, onSetPrice, onOpen, onRemove }) {
 }
 
 function ItemCard({ item, score, onOpen, onRemove }) {
+  const confidence = nutritionConfidence(item)
   return (
     <div className="card item-card">
       <ScoreBadge score={score.composite} />
@@ -137,6 +143,11 @@ function ItemCard({ item, score, onOpen, onRemove }) {
           {score.costPer100gProtein != null
             ? `${gbp(score.costPer100gProtein)} / 100g protein`
             : 'No protein value'}
+          {confidence.level !== 'ok' && (
+            <span className="muted" title="Some nutrition data was missing or estimated — tap to check">
+              {' · '}{confidence.level === 'low' ? '⚠️ estimated' : 'ℹ️ estimated'}
+            </span>
+          )}
         </div>
         {(item.nutriscoreGrade || item.novaGroup || item.additivesCount != null) && (
           <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
@@ -152,7 +163,7 @@ function ItemCard({ item, score, onOpen, onRemove }) {
 }
 
 function BasketSummary({ summary }) {
-  const { totals, composite, costPerProteinDay, proteinTarget } = summary
+  const { totals, composite, costPerProteinDay, proteinDays, proteinTarget } = summary
   return (
     <div className="card">
       <div className="spread" style={{ marginBottom: 10 }}>
@@ -162,6 +173,8 @@ function BasketSummary({ summary }) {
         </div>
         <ScoreBadge score={composite} size="lg" />
       </div>
+
+      <ProteinGoal proteinDays={proteinDays} proteinTarget={proteinTarget} />
 
       <div className="totals-grid">
         <div className="spread"><span className="k">Total spend</span><span className="v">{gbp(totals.price)}</span></div>
@@ -179,6 +192,29 @@ function BasketSummary({ summary }) {
         <span style={{ fontWeight: 700 }}>
           {costPerProteinDay != null ? gbp(costPerProteinDay) : '—'}
         </span>
+      </div>
+    </div>
+  )
+}
+
+// Personal progress meter — how many days of your protein target this basket's
+// protein covers. Progress feedback toward your own goal, no leaderboard. The
+// bar fills over one day; beyond that it reads "N.N days".
+function ProteinGoal({ proteinDays, proteinTarget }) {
+  if (proteinDays == null || proteinDays <= 0) return null
+  const pct = Math.max(0, Math.min(100, proteinDays * 100))
+  const label =
+    proteinDays >= 1
+      ? `${proteinDays.toFixed(1)} days of protein`
+      : `${Math.round(proteinDays * 100)}% of a day’s protein`
+  return (
+    <div className="metric" style={{ marginBottom: 12 }}>
+      <div className="spread small" style={{ marginBottom: 4 }}>
+        <span className="muted">Protein goal · {proteinTarget}g/day</span>
+        <span style={{ fontWeight: 700 }}>{label}</span>
+      </div>
+      <div className="bar">
+        <span style={{ width: `${pct}%`, background: 'var(--accent)' }} />
       </div>
     </div>
   )

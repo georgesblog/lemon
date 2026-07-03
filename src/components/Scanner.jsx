@@ -66,7 +66,7 @@ async function ensureWasm() {
   return wasmReadyPromise
 }
 
-export default function Scanner({ onDetected, onClose, onManual, mode = 'single' }) {
+export default function Scanner({ onDetected, onClose, onManual, onSearch, mode = 'single' }) {
   const multi = mode === 'multi' // rapid mode: add instantly, keep the camera open
   const videoRef = useRef(null)
   const firedRef = useRef(false)
@@ -313,11 +313,15 @@ export default function Scanner({ onDetected, onClose, onManual, mode = 'single'
           </button>
         </div>
       ) : (
-        !error && torchAvailable && (
-          <div className="scanner-subhint">
-            <button className="linkbtn" onClick={onManual}>Enter barcode manually</button>
-          </div>
-        )
+        <div className="scanner-subhint">
+          <button className="linkbtn" onClick={onManual}>Enter barcode manually</button>
+          {onSearch && (
+            <>
+              <span style={{ color: '#fff', opacity: 0.5, margin: '0 8px' }}>·</span>
+              <button className="linkbtn" onClick={onSearch}>Search by name</button>
+            </>
+          )}
+        </div>
       )}
     </div>
   )

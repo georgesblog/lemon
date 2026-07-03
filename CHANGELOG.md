@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **"Better pick" on every scan** — the confirm screen now automatically surfaces
+  higher-protein alternatives in the same Open Food Facts category (UK) the moment
+  it opens, instead of hiding them behind a button. If the item you scanned is
+  already near the top of its category it says so; otherwise it lists the stronger
+  options (protein per 100g, and protein per 100 kcal where known). Best-effort —
+  it loads quietly and hides entirely if the category search returns nothing.
+- **Search by name** — when a barcode won't scan or a product isn't keyed by its
+  barcode, search Open Food Facts by name instead. Reachable from the scanner
+  ("Search by name"), the empty basket, and manual entry; pick a result and it
+  flows into the same confirm-and-price screen as a scan.
+- **Protein goal progress** in the basket — a meter showing how many days of your
+  protein target the basket now covers ("1.4 days of protein at 150g/day"),
+  turning the shop into visible progress toward your own goal.
+- **Score trust signals** — the confirm screen flags when a score rests on
+  incomplete data (missing protein/calories/pack size, or figures converted from
+  a per-serving label) so you know when to double-check, and priced basket items
+  carry a small "estimated" marker when their nutrition was partial.
+- **30-second first run** — a skippable setup on first launch (goal, protein
+  target, usual store) drops you straight into scanning, with no account. The
+  usual store is remembered and shown, and everything stays on the device.
 - **Rapid multi-scan mode** (⚡ Rapid) — scan many items in a row without
   stopping; each is added to the basket from its Open Food Facts data the moment
   it's read, the camera stays open, and a counter tracks the haul. Built for

@@ -177,14 +177,39 @@ export function basketSummary(items, weights, proteinTarget = DEFAULT_PROTEIN_TA
   const costPerProteinDay =
     basketCostPer100gProtein != null ? basketCostPer100gProtein * (proteinTarget / 100) : null
 
+  // How many days of your protein target this basket covers — a personal
+  // progress figure (no competition), e.g. "2.3 days at 150g/day".
+  const proteinDays = proteinTarget > 0 ? totals.protein / proteinTarget : null
+
   return {
     count: items.length,
     totals: roundTotals(totals),
     composite,
     basketCostPer100gProtein,
     costPerProteinDay,
+    proteinDays,
     proteinTarget,
   }
+}
+
+// ── Trust signal: how much of the score rests on solid data ──────────────────
+// The score only means something if the numbers behind it are real. Flags when
+// the key inputs (protein, energy, price, pack size) are missing, or when
+// Open Food Facts gave figures per serving that we converted to per-100g.
+// Returns { level: 'ok' | 'partial' | 'low', missing: [...], perServing }.
+export function nutritionConfidence(item) {
+  const n = item?.nutriments || {}
+  const missing = []
+  // Only the inputs whose absence actually distorts the score. (Missing carbs
+  // just makes sugar-to-carb a non-issue, so it isn't flagged as low-trust.)
+  if (!Number.isFinite(+n.proteins)) missing.push('protein')
+  if (!Number.isFinite(+n.energyKcal)) missing.push('calories')
+  if (!Number.isFinite(+item?.packGrams) || +item.packGrams <= 0) missing.push('pack size')
+  const perServing = item?.nutritionDataPer === 'serving'
+  let level = 'ok'
+  if (missing.length >= 2) level = 'low'
+  else if (missing.length === 1 || perServing) level = 'partial'
+  return { level, missing, perServing }
 }
 
 // Plain-English one-liner per item, no API needed. (An optional Claude-powered

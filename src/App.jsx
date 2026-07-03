@@ -3,6 +3,8 @@ import ItemForm from './components/ItemForm.jsx'
 import Basket from './components/Basket.jsx'
 import Compare from './components/Compare.jsx'
 import Settings from './components/Settings.jsx'
+import ProductSearch from './components/ProductSearch.jsx'
+import Onboarding from './components/Onboarding.jsx'
 import { fetchProduct } from './lib/openfoodfacts.js'
 import { fetchPriceInfo } from './lib/openprices.js'
 import { isRestrictedCirculation } from './lib/barcode.js'
@@ -22,6 +24,7 @@ export default function App() {
 
   const [view, setView] = useState('basket') // basket | compare | settings
   const [scanning, setScanning] = useState(false)
+  const [searching, setSearching] = useState(false) // search-by-name fallback
   const [scanMode, setScanMode] = useState('single') // single | multi (rapid)
   const [editing, setEditing] = useState(null) // draft item being confirmed
   const [busy, setBusy] = useState(false)
@@ -50,10 +53,16 @@ export default function App() {
     setScanning(true)
   }, [])
 
+  const startSearch = useCallback(() => {
+    setScanning(false)
+    setSearching(true)
+  }, [])
+
   // ── Single scan → fetch → confirm (price prefilled) ──────────────────────
   const onDetected = useCallback(
     async (barcode) => {
       setScanning(false)
+      setSearching(false)
       setBusy(true)
       // Look up the community price in parallel with the product so the price
       // suggestion is already there when the confirm screen opens.
@@ -114,7 +123,12 @@ export default function App() {
 
   const openManual = useCallback(() => {
     setScanning(false)
+    setSearching(false)
     setEditing(blankDraft(null))
+  }, [])
+
+  const finishOnboarding = useCallback((patch) => {
+    setSettings((s) => ({ ...s, ...patch }))
   }, [])
 
   const saveItem = useCallback(
@@ -136,6 +150,12 @@ export default function App() {
   }, [])
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // First run: a ≤30s, skippable goal setup before the empty basket. Never
+  // interrupts an existing user (guarded on an empty basket).
+  if (!settings.onboarded && items.length === 0 && !editing) {
+    return <Onboarding onDone={finishOnboarding} />
+  }
+
   if (scanning) {
     return (
       <Suspense fallback={<div className="toast">Starting camera…</div>}>
@@ -144,6 +164,7 @@ export default function App() {
           onDetected={scanMode === 'multi' ? onDetectedMulti : onDetected}
           onClose={() => setScanning(false)}
           onManual={openManual}
+          onSearch={scanMode === 'multi' ? undefined : startSearch}
         />
       </Suspense>
     )
@@ -160,14 +181,21 @@ export default function App() {
         </div>
       </header>
 
-      {!editing && view === 'basket' && (
+      {!editing && !searching && view === 'basket' && (
         <nav className="subnav row" style={{ gap: 8 }}>
           <span className="pill">{describePreset(settings.preset)}</span>
+          {settings.store && <span className="pill">🏬 {settings.store}</span>}
         </nav>
       )}
 
       <main className="content">
-        {editing ? (
+        {searching ? (
+          <ProductSearch
+            onPick={onDetected}
+            onManual={openManual}
+            onClose={() => setSearching(false)}
+          />
+        ) : editing ? (
           <ItemForm
             draft={editing}
             weights={weights}
@@ -183,6 +211,7 @@ export default function App() {
             onOpen={(item) => setEditing(item)}
             onRemove={removeItem}
             onSetPrice={setItemPrice}
+            onSearch={startSearch}
           />
         ) : view === 'compare' ? (
           <Compare items={items} weights={weights} onClose={() => setView('basket')} />
@@ -190,15 +219,17 @@ export default function App() {
           <Settings
             preset={settings.preset}
             proteinTarget={settings.proteinTarget}
+            store={settings.store}
             onChangePreset={(preset) => setSettings((s) => ({ ...s, preset }))}
             onChangeTarget={(proteinTarget) => setSettings((s) => ({ ...s, proteinTarget }))}
+            onChangeStore={(store) => setSettings((s) => ({ ...s, store: store.trim() || null }))}
             onClose={() => setView('basket')}
           />
         )}
       </main>
 
-      {/* Bottom action bar (hidden while editing or in settings, which carry their own) */}
-      {!editing && (view === 'basket' || view === 'compare') && (
+      {/* Bottom action bar (hidden while editing/searching or in settings, which carry their own) */}
+      {!editing && !searching && (view === 'basket' || view === 'compare') && (
         <div className="actionbar">
           {view === 'basket' ? (
             <>

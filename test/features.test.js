@@ -2,8 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { parseDietary, tagLabels } from '../src/lib/openfoodfacts.js'
 import { aggregate, priceVerdict } from '../src/lib/openprices.js'
-import { buildSearchUrl } from '../src/lib/offsearch.js'
-import { servingMacros, needsPrice } from '../src/lib/scoring.js'
+import { buildSearchUrl, betterProteinPicks } from '../src/lib/offsearch.js'
+import { servingMacros, needsPrice, nutritionConfidence, basketSummary, PRESETS } from '../src/lib/scoring.js'
 
 // ── Dietary flags (#3) ───────────────────────────────────────────────────────
 test('parseDietary collapses OFF analysis tags to simple statuses', () => {
@@ -69,4 +69,60 @@ test('servingMacros scales per-100g nutrition to one serving', () => {
   assert.equal(m.sugars, 6)
   assert.equal(servingMacros({ proteins: 10 }, 0), null) // no serving size
   assert.equal(servingMacros({ proteins: 10 }, null), null)
+})
+
+// ── "Better pick" alternatives ───────────────────────────────────────────────
+test('betterProteinPicks keeps only meaningfully higher-protein items', () => {
+  const rows = [
+    { code: 'A', protein: 24 },
+    { code: 'B', protein: 21 },
+    { code: 'SELF', protein: 10 }, // the scanned item, echoed back by search
+    { code: 'C', protein: 11 }, // barely above → within margin, dropped
+    { code: 'D', protein: 8 }, // lower, dropped
+  ]
+  const picks = betterProteinPicks(rows, { currentProtein: 10, currentBarcode: 'SELF', margin: 2 })
+  assert.deepEqual(picks.map((p) => p.code), ['A', 'B'])
+})
+
+test('betterProteinPicks caps to top N and excludes the current item', () => {
+  const rows = Array.from({ length: 6 }, (_, i) => ({ code: `c${i}`, protein: 30 - i }))
+  const picks = betterProteinPicks(rows, { currentProtein: 5, currentBarcode: 'c0', top: 3 })
+  assert.equal(picks.length, 3)
+  assert.ok(!picks.some((p) => p.code === 'c0'))
+})
+
+test('betterProteinPicks with unknown current protein treats all as candidates', () => {
+  const rows = [{ code: 'A', protein: 5 }, { code: 'B', protein: 3 }]
+  const picks = betterProteinPicks(rows, { currentProtein: 0 })
+  assert.equal(picks.length, 2)
+})
+
+// ── Trust signals ────────────────────────────────────────────────────────────
+test('nutritionConfidence flags missing score inputs', () => {
+  const full = { packGrams: 500, nutriments: { proteins: 10, energyKcal: 60 } }
+  assert.equal(nutritionConfidence(full).level, 'ok')
+
+  const noPack = { nutriments: { proteins: 10, energyKcal: 60 } }
+  const c1 = nutritionConfidence(noPack)
+  assert.equal(c1.level, 'partial')
+  assert.deepEqual(c1.missing, ['pack size'])
+
+  const bare = { nutriments: {} }
+  assert.equal(nutritionConfidence(bare).level, 'low') // protein + calories + pack all gone
+
+  const perServing = {
+    packGrams: 500, nutritionDataPer: 'serving', nutriments: { proteins: 10, energyKcal: 60 },
+  }
+  const c2 = nutritionConfidence(perServing)
+  assert.equal(c2.level, 'partial')
+  assert.equal(c2.perServing, true)
+})
+
+// ── Goal progress ────────────────────────────────────────────────────────────
+test('basketSummary reports days of protein toward the target', () => {
+  const item = { price: 2, packGrams: 1000, nutriments: { proteins: 15, energyKcal: 60, carbs: 4, sugars: 4 } }
+  // 1000g × 15/100 = 150g protein in the basket.
+  const s = basketSummary([item], PRESETS.balanced.weights, 150)
+  assert.ok(Math.abs(s.proteinDays - 1) < 1e-9) // exactly one day at 150g/day
+  assert.equal(basketSummary([], PRESETS.balanced.weights, 150).proteinDays, 0)
 })
