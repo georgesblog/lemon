@@ -1,0 +1,5 @@
+# Supabase CLI local state — never commit. These hold the linked project ref,
+# local branch state, and any local .env the CLI writes.
+.branches
+.temp
+.env

@@ -1,0 +1,10 @@
+# Supabase CLI project config. `project_id` is a local label only — it is NOT a
+# secret and is unrelated to the linked remote project ref (which the CLI stores
+# under supabase/.temp, gitignored). Run `supabase link` to connect this repo to
+# the remote "Lemon" project, then `npm run db:push` to apply migrations.
+project_id = "lemon"
+
+[db]
+# Postgres major version of the remote project. 15 is Supabase's current
+# default; bump this only if the dashboard shows otherwise.
+major_version = 15

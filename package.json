@@ -8,9 +8,15 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "db:link": "supabase link",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "db:pull": "supabase db pull",
+    "db:new": "supabase migration new"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.0",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "react": "^18.3.1",
