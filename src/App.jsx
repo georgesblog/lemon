@@ -3,6 +3,7 @@ import ItemForm from './components/ItemForm.jsx'
 import Basket from './components/Basket.jsx'
 import Compare from './components/Compare.jsx'
 import Settings from './components/Settings.jsx'
+import SavedBaskets from './components/SavedBaskets.jsx'
 import ProductSearch from './components/ProductSearch.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import { fetchProduct } from './lib/openfoodfacts.js'
@@ -22,7 +23,7 @@ export default function App() {
     ...loadSettings(),
   }))
 
-  const [view, setView] = useState('basket') // basket | compare | settings
+  const [view, setView] = useState('basket') // basket | compare | settings | saved
   const [scanning, setScanning] = useState(false)
   const [searching, setSearching] = useState(false) // search-by-name fallback
   const [scanMode, setScanMode] = useState('single') // single | multi (rapid)
@@ -149,6 +150,14 @@ export default function App() {
     setItems((prev) => prev.filter((it) => it.id !== id))
   }, [])
 
+  // Replace the working basket with a saved/template basket, then return home.
+  const loadSaved = useCallback((newItems) => {
+    setItems(newItems)
+    setEditing(null)
+    setSearching(false)
+    setView('basket')
+  }, [])
+
   // ── Render ──────────────────────────────────────────────────────────────
   // First run: a ≤30s, skippable goal setup before the empty basket. Never
   // interrupts an existing user (guarded on an empty basket).
@@ -175,6 +184,9 @@ export default function App() {
       <header className="topbar">
         <h1><span className="logo-dot" /> Basket Score</h1>
         <div className="row">
+          {!editing && !searching && view !== 'settings' && view !== 'saved' && (
+            <button className="iconbtn" onClick={() => setView('saved')} aria-label="Saved baskets">🗂</button>
+          )}
           {view !== 'settings' && (
             <button className="iconbtn" onClick={() => setView('settings')} aria-label="Settings">⚙</button>
           )}
@@ -215,6 +227,13 @@ export default function App() {
           />
         ) : view === 'compare' ? (
           <Compare items={items} weights={weights} onClose={() => setView('basket')} />
+        ) : view === 'saved' ? (
+          <SavedBaskets
+            currentItems={items}
+            onLoad={loadSaved}
+            onClose={() => setView('basket')}
+            flash={flash}
+          />
         ) : (
           <Settings
             preset={settings.preset}
