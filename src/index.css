@@ -186,6 +186,11 @@ input, select {
 }
 .field .with-prefix input { padding-left: 26px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.checkrow {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--muted);
+}
+.checkrow input { width: auto; }
 
 /* ── Scanner ─────────────────────────────────────────────── */
 .scanner-wrap {

@@ -14,8 +14,11 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// `import.meta.env` is injected by Vite; fall back to {} so this module (and
+// anything importing it) also loads under plain Node — e.g. the unit tests.
+const env = import.meta.env ?? {}
+const url = env.VITE_SUPABASE_URL
+const anonKey = env.VITE_SUPABASE_ANON_KEY
 
 export const supabase =
   url && anonKey

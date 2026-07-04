@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Saved baskets & templates** (🗂) — save the current basket under a name to
+  reload later, or save it as a reusable **template** and start a fresh shop from
+  it (products kept, prices cleared so the Needs-price tray walks you through
+  re-pricing). Rename, delete, and reload from the list. Offline-first like the
+  rest of the app: baskets sync across devices through Supabase when you're signed
+  in (anonymous auth), and fall back to on-device storage otherwise — same UI
+  either way. Items round-trip losslessly (scoring fields as columns, everything
+  else in a JSONB `extra`), each protected by row-level security.
 - **"Better pick" on every scan** — the confirm screen now automatically surfaces
   higher-protein alternatives in the same Open Food Facts category (UK) the moment
   it opens, instead of hiding them behind a button. If the item you scanned is
