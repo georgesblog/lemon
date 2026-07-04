@@ -4,3 +4,10 @@ dist-ssr
 .DS_Store
 *.local
 .vite
+
+# Secrets / env — only .env.example is tracked. `*.local` already covers
+# .env.local; these lines catch the other conventional env filenames so a real
+# key can never be committed by accident.
+.env
+.env.*
+!.env.example

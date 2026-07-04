@@ -35,6 +35,12 @@ jobs:
       - run: npm run build
         env:
           BASE_PATH: /lemon/
+          # Public Supabase values (safe in the client bundle; RLS is the real
+          # boundary). Unset → the app builds in offline-only mode. Add these as
+          # repo secrets to turn cloud sync on. Never add service_role / DB
+          # password here.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/configure-pages@v5
         with:
           # Turn Pages on automatically so no manual repo-settings step is
