@@ -30,6 +30,7 @@ async function cloudSession() {
 const EXTRA_FIELDS = [
   'image', 'nutritionImage', 'servingQuantity', 'nutritionDataPer',
   'nutrientLevels', 'dietary', 'additivesCount', 'allergens', 'traces',
+  'bucket', // the (possibly hand-corrected) shelf a saved item belongs to
 ]
 
 export function itemToRow(item, position) {
