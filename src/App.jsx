@@ -6,10 +6,13 @@ import Settings from './components/Settings.jsx'
 import SavedBaskets from './components/SavedBaskets.jsx'
 import ProductSearch from './components/ProductSearch.jsx'
 import Onboarding from './components/Onboarding.jsx'
+import { SharedBoardView } from './components/Share.jsx'
+import { parseShareHash } from './lib/share.js'
 import { fetchProduct } from './lib/openfoodfacts.js'
 import { fetchPriceInfo } from './lib/openprices.js'
 import { isRestrictedCirculation } from './lib/barcode.js'
 import { PRESETS, DEFAULT_PRESET, DEFAULT_PROTEIN_TARGET } from './lib/scoring.js'
+import { classifyBucket } from './lib/buckets.js'
 import { loadBasket, saveBasket, loadSettings, saveSettings, makeId } from './lib/storage.js'
 
 // ZXing is ~300 kB — only pull it in when the user actually opens the scanner.
@@ -22,6 +25,12 @@ export default function App() {
     proteinTarget: DEFAULT_PROTEIN_TARGET,
     ...loadSettings(),
   }))
+
+  // A shared-link route (…/#/s/<token>) short-circuits the whole app into a
+  // read-only viewer. Tracked here and kept in sync with the browser hash.
+  const [shareToken, setShareToken] = useState(() =>
+    typeof window !== 'undefined' ? parseShareHash(window.location.hash) : null
+  )
 
   const [view, setView] = useState('basket') // basket | compare | settings | saved
   const [scanning, setScanning] = useState(false)
@@ -43,6 +52,13 @@ export default function App() {
     saveBasket(items)
   }, [items])
   useEffect(() => saveSettings(settings), [settings])
+
+  // Follow back/forward and in-app changes to the share route.
+  useEffect(() => {
+    const onHash = () => setShareToken(parseShareHash(window.location.hash))
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
 
   const flash = useCallback((msg) => {
     setToast(msg)
@@ -104,12 +120,12 @@ export default function App() {
         const product = await fetchProduct(barcode)
         // Re-check after the lookup in case it was added meanwhile.
         if (itemsRef.current.some((it) => it.barcode === barcode)) return
-        const item = { ...(product || blankDraft(barcode)), id: makeId(), price: null }
+        const item = stampBucket({ ...(product || blankDraft(barcode)), id: makeId(), price: null })
         itemsRef.current = [...itemsRef.current, item] // keep the mirror current now
         setItems((prev) => [...prev, item])
         flash(product ? `Added ${product.name || 'item'}` : 'Added — needs details')
       } catch {
-        const item = { ...blankDraft(barcode), id: makeId() }
+        const item = stampBucket({ ...blankDraft(barcode), id: makeId() })
         itemsRef.current = [...itemsRef.current, item]
         setItems((prev) => [...prev, item])
         flash('Added — lookup failed, add details later')
@@ -120,6 +136,12 @@ export default function App() {
 
   const setItemPrice = useCallback((id, price) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, price } : it)))
+  }, [])
+
+  // One-tap re-bucket from the basket; the explicit choice sticks on the item
+  // and round-trips through saved baskets.
+  const setItemBucket = useCallback((id, bucket) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, bucket } : it)))
   }, [])
 
   const openManual = useCallback(() => {
@@ -138,7 +160,7 @@ export default function App() {
         if (candidate.id) {
           return prev.map((it) => (it.id === candidate.id ? { ...candidate } : it))
         }
-        return [...prev, { ...candidate, id: makeId() }]
+        return [...prev, stampBucket({ ...candidate, id: makeId() })]
       })
       setEditing(null)
       flash(candidate.id ? 'Updated' : 'Added to basket')
@@ -159,6 +181,17 @@ export default function App() {
   }, [])
 
   // ── Render ──────────────────────────────────────────────────────────────
+  // A shared link wins over everything: it's a public, read-only route that must
+  // render for anyone with the token, regardless of local basket or onboarding.
+  if (shareToken) {
+    return (
+      <SharedBoardView
+        token={shareToken}
+        onExit={() => { window.location.hash = ''; setShareToken(null) }}
+      />
+    )
+  }
+
   // First run: a ≤30s, skippable goal setup before the empty basket. Never
   // interrupts an existing user (guarded on an empty basket).
   if (!settings.onboarded && items.length === 0 && !editing) {
@@ -223,6 +256,7 @@ export default function App() {
             onOpen={(item) => setEditing(item)}
             onRemove={removeItem}
             onSetPrice={setItemPrice}
+            onSetBucket={setItemBucket}
             onSearch={startSearch}
           />
         ) : view === 'compare' ? (
@@ -277,6 +311,13 @@ export default function App() {
       {toast && <div className="toast">{toast}</div>}
     </div>
   )
+}
+
+// Give an item its shelf on the way into the basket (unless it already carries
+// one, e.g. loaded from a saved basket), so grouping is instant and the guess
+// persists. bucketOf still classifies lazily for any older item without it.
+function stampBucket(item) {
+  return item.bucket ? item : { ...item, bucket: classifyBucket(item) }
 }
 
 function blankDraft(barcode) {
