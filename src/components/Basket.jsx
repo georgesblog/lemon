@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { scoreItem, verdict, basketSummary, needsPrice, nutritionConfidence } from '../lib/scoring.js'
+import { scoreItem, verdict, basketSummary, needsPrice, nutritionConfidence, proteinPortion } from '../lib/scoring.js'
 import { fetchPriceInfo } from '../lib/openprices.js'
 import { BUCKETS, SORTS, bucketMeta, bucketOf, groupByBucket, sortEntries } from '../lib/buckets.js'
 import { gbp, grams, kcal } from '../lib/format.js'
-import { ScoreBadge, NutriScore, NovaBadge, DietaryBadges } from './Bits.jsx'
+import { ScoreBadge, NutriScore, NovaBadge, DietaryBadges, ProteinBadge } from './Bits.jsx'
 import { ShareBar } from './Share.jsx'
 
 // The home view: a "needs price" tray for freshly-scanned items, then the priced
@@ -225,6 +225,7 @@ function PriceRow({ item, onSetPrice, onOpen, onRemove, onSetBucket }) {
 
 function ItemCard({ item, score, onOpen, onRemove, onSetBucket }) {
   const confidence = nutritionConfidence(item)
+  const portion = proteinPortion(item)
   return (
     <div className="card item-card">
       <Thumb item={item} score={score} />
@@ -244,8 +245,9 @@ function ItemCard({ item, score, onOpen, onRemove, onSetBucket }) {
             </span>
           )}
         </div>
-        {(item.nutriscoreGrade || item.novaGroup || item.additivesCount != null) && (
+        {(portion || item.nutriscoreGrade || item.novaGroup || item.additivesCount != null) && (
           <div className="row wrap" style={{ gap: 6, marginTop: 6 }}>
+            <ProteinBadge portion={portion} />
             <NutriScore grade={item.nutriscoreGrade} />
             <NovaBadge group={item.novaGroup} />
             <DietaryBadges dietary={item.dietary} additivesCount={item.additivesCount} />

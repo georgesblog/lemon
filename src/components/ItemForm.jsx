@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { scoreItem, verdict, servingMacros, nutritionConfidence } from '../lib/scoring.js'
+import { scoreItem, verdict, servingMacros, nutritionConfidence, proteinPortion } from '../lib/scoring.js'
 import { fetchPriceInfo, priceVerdict } from '../lib/openprices.js'
 import { topProteinInCategory, betterProteinPicks } from '../lib/offsearch.js'
 import { gbp, grams, kcal } from '../lib/format.js'
-import { ScoreBadge, MetricBar, NutriScore, NovaBadge, DietaryBadges, PriceVerdictBadge } from './Bits.jsx'
+import { ScoreBadge, MetricBar, NutriScore, NovaBadge, DietaryBadges, PriceVerdictBadge, ProteinBadge } from './Bits.jsx'
 
 // Confirm & price a scanned item — or fill one in by hand. Nutrition arrives
 // pre-filled from Open Food Facts but every field is editable in case the API
@@ -80,6 +80,7 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
 
   const score = useMemo(() => scoreItem(candidate, weights), [candidate, weights])
   const confidence = useMemo(() => nutritionConfidence(candidate), [candidate])
+  const portion = useMemo(() => proteinPortion(candidate), [candidate])
   const pVerdict = priceVerdict(price, priceInfo)
   const perServing = useMemo(
     () => servingMacros(candidate.nutriments, draft?.servingQuantity),
@@ -120,8 +121,9 @@ export default function ItemForm({ draft, weights, onSave, onCancel, loading }) 
       {(score.composite > 0 || confidence.perServing) && <ConfidenceHint confidence={confidence} />}
 
       {/* Open Food Facts context badges: health grade, processing, diet flags */}
-      {(draft?.nutriscoreGrade || draft?.novaGroup || hasDietary(draft)) && (
+      {(portion || draft?.nutriscoreGrade || draft?.novaGroup || hasDietary(draft)) && (
         <div className="row wrap" style={{ gap: 8, margin: '0 2px 12px' }}>
+          <ProteinBadge portion={portion} />
           <NutriScore grade={draft.nutriscoreGrade} />
           <NovaBadge group={draft.novaGroup} />
           <DietaryBadges dietary={draft.dietary} additivesCount={draft.additivesCount} />

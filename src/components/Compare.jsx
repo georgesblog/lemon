@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { scoreItem, verdict } from '../lib/scoring.js'
-import { gbp, one } from '../lib/format.js'
+import { scoreItem, verdict, proteinPortion } from '../lib/scoring.js'
+import { gbp, one, grams } from '../lib/format.js'
 import { ScoreBadge } from './Bits.jsx'
 
 // Side-by-side comparison — the "two tubs of Greek yogurt" use case. Pick any
@@ -57,7 +57,13 @@ function ComparisonTable({ a, b, weights }) {
 
   // For each row, mark the better side. `lowerWins` flips the comparison for
   // cost-style metrics where smaller is better.
+  // Absolute protein you actually get per portion — the quantity lens, separate
+  // from the efficiency sub-scores. min: 0 so we always show the raw figure.
+  const pa = proteinPortion(a, { min: 0 })
+  const pb = proteinPortion(b, { min: 0 })
+
   const rows = [
+    { label: 'Protein / portion', av: pa?.grams ?? null, bv: pb?.grams ?? null, fmt: grams },
     { label: '£ / 100g protein', av: sa.costPer100gProtein, bv: sb.costPer100gProtein, fmt: gbp, lowerWins: true },
     { label: 'Protein value', av: sa.subScores.value, bv: sb.subScores.value, fmt: one },
     { label: 'Protein-to-cal', av: sa.subScores.proteinCal, bv: sb.subScores.proteinCal, fmt: one },
