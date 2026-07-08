@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Protein-per-portion signal** — a 💪 badge showing how much protein you
+  actually get in one portion (e.g. "💪 33g protein"), turning green when it's a
+  genuinely high hit (20g+). This is the *quantity* lens the fitness-value score
+  deliberately leaves out: the score rates protein *efficiency* (per £, per
+  calorie), so a high-protein-but-pricey item like a 33g meal-deal sandwich can
+  score low — the badge makes sure it isn't dismissed on cost alone. It prefers
+  the labelled serving size (so a litre of milk isn't counted as one sitting),
+  falls back to small single-portion packs, and shows on basket cards and the
+  confirm screen ahead of the additives/dietary chips. Compare now has a
+  **"Protein / portion"** row too, so two items' protein hits sit side by side.
 - **Saved baskets & templates** (🗂) — save the current basket under a name to
   reload later, or save it as a reusable **template** and start a fresh shop from
   it (products kept, prices cleared so the Needs-price tray walks you through

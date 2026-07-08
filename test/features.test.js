@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { parseDietary, tagLabels } from '../src/lib/openfoodfacts.js'
 import { aggregate, priceVerdict } from '../src/lib/openprices.js'
 import { buildSearchUrl, betterProteinPicks } from '../src/lib/offsearch.js'
-import { servingMacros, needsPrice, nutritionConfidence, basketSummary, PRESETS } from '../src/lib/scoring.js'
+import { servingMacros, needsPrice, nutritionConfidence, basketSummary, proteinPortion, PRESETS } from '../src/lib/scoring.js'
 
 // ── Dietary flags (#3) ───────────────────────────────────────────────────────
 test('parseDietary collapses OFF analysis tags to simple statuses', () => {
@@ -116,6 +116,39 @@ test('nutritionConfidence flags missing score inputs', () => {
   const c2 = nutritionConfidence(perServing)
   assert.equal(c2.level, 'partial')
   assert.equal(c2.perServing, true)
+})
+
+// ── Protein per portion (quantity signal) ────────────────────────────────────
+test('proteinPortion uses serving size and tiers high vs good', () => {
+  // 20g/100g protein × 150g serving = 30g → high.
+  const high = proteinPortion({ servingQuantity: 150, nutriments: { proteins: 20 } })
+  assert.equal(high.grams, 30)
+  assert.equal(high.basis, 'serving')
+  assert.equal(high.tier, 'high')
+
+  // 10g/100g × 150g serving = 15g → good (≥10, <20).
+  const good = proteinPortion({ servingQuantity: 150, nutriments: { proteins: 10 } })
+  assert.equal(good.grams, 15)
+  assert.equal(good.tier, 'good')
+})
+
+test('proteinPortion falls back to a small pack, but not a large one', () => {
+  // No serving size, 200g single-serve pack at 8g/100g = 16g → good, basis pack.
+  const pack = proteinPortion({ packGrams: 200, nutriments: { proteins: 8 } })
+  assert.equal(pack.grams, 16)
+  assert.equal(pack.basis, 'pack')
+
+  // A 1L milk (no serving size) must not be treated as one portion.
+  assert.equal(proteinPortion({ packGrams: 1000, nutriments: { proteins: 3.4 } }), null)
+})
+
+test('proteinPortion hides trivial amounts unless min is lowered', () => {
+  // 5g/100g × 100g = 5g → below the 10g flag threshold → null by default.
+  assert.equal(proteinPortion({ servingQuantity: 100, nutriments: { proteins: 5 } }), null)
+  // …but Compare asks for the raw figure with min: 0.
+  assert.equal(proteinPortion({ servingQuantity: 100, nutriments: { proteins: 5 } }, { min: 0 }).grams, 5)
+  // No protein at all → null.
+  assert.equal(proteinPortion({ servingQuantity: 150, nutriments: {} }), null)
 })
 
 // ── Goal progress ────────────────────────────────────────────────────────────

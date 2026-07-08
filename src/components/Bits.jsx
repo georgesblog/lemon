@@ -51,6 +51,23 @@ export function DietaryBadges({ dietary, additivesCount }) {
   )
 }
 
+// Absolute protein-per-portion chip — the "quantity" signal (how much protein
+// you actually get in a sitting), distinct from the value/leanness score. Green
+// when it's a genuinely high hit. Hidden when there's no usable portion figure.
+export function ProteinBadge({ portion }) {
+  if (!portion) return null
+  const strong = portion.tier === 'high'
+  return (
+    <span
+      className="tag-badge"
+      style={{ background: strong ? '#2f8f5b' : '#3a4a63', color: '#fff' }}
+      title={`≈ ${portion.grams}g protein per ${portion.basis}`}
+    >
+      💪 {portion.grams}g protein
+    </span>
+  )
+}
+
 // Coloured chip for an Open Prices "is this a good price?" verdict.
 const PRICE_TONES = { good: '#2f8f5b', ok: '#5a6675', warn: '#b8761f', bad: '#c0392b' }
 export function PriceVerdictBadge({ verdict }) {

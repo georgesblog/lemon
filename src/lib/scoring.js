@@ -148,6 +148,41 @@ export function servingMacros(nutriments = {}, servingGrams) {
   }
 }
 
+// ── Protein quantity ("did I actually get a decent hit?") ────────────────────
+// The composite score rates protein *efficiency* (per £, per calorie) and
+// deliberately ignores how much protein an item actually delivers. This is the
+// complementary quantity lens: the absolute protein in one portion. A 33g-protein
+// sandwich can score poorly on value yet still be a genuinely useful protein hit.
+export const PROTEIN_PORTION_MIN = 10 // g/portion below which it isn't worth flagging
+export const PROTEIN_PORTION_HIGH = 20 // g/portion that counts as a genuinely high hit
+const PACK_AS_PORTION_MAX = 400 // g: only treat a whole pack as one portion below this
+
+// Prefers the labelled serving size so a multi-serving pack (a litre of milk)
+// isn't overstated; falls back to the pack only when it's small enough to
+// plausibly be eaten in one go. Returns { grams, basis: 'serving'|'pack',
+// tier: 'high'|'good' } or null (no protein / no usable portion size / below
+// `min`). Pass { min: 0 } to get the raw figure for a direct comparison.
+export function proteinPortion(item, { min = PROTEIN_PORTION_MIN } = {}) {
+  const p100 = num((item?.nutriments || {}).proteins)
+  if (p100 <= 0) return null
+  const sq = num(item?.servingQuantity)
+  const pack = num(item?.packGrams)
+  let portionGrams
+  let basis
+  if (sq > 0) {
+    portionGrams = sq
+    basis = 'serving'
+  } else if (pack > 0 && pack <= PACK_AS_PORTION_MAX) {
+    portionGrams = pack
+    basis = 'pack'
+  } else {
+    return null
+  }
+  const grams = (p100 * portionGrams) / 100
+  if (grams < min) return null
+  return { grams: Math.round(grams), basis, tier: grams >= PROTEIN_PORTION_HIGH ? 'high' : 'good' }
+}
+
 // ── Basket-level aggregates ──────────────────────────────────────────────────
 export function basketSummary(items, weights, proteinTarget = DEFAULT_PROTEIN_TARGET) {
   const totals = { price: 0, protein: 0, kcal: 0, carbs: 0, sugars: 0, fiber: 0, fat: 0, satFat: 0 }
