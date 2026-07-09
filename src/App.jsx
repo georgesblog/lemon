@@ -4,6 +4,7 @@ import Basket from './components/Basket.jsx'
 import Compare from './components/Compare.jsx'
 import Settings from './components/Settings.jsx'
 import SavedBaskets from './components/SavedBaskets.jsx'
+import CatalogCompare from './components/CatalogCompare.jsx'
 import ProductSearch from './components/ProductSearch.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import { SharedBoardView } from './components/Share.jsx'
@@ -32,7 +33,7 @@ export default function App() {
     typeof window !== 'undefined' ? parseShareHash(window.location.hash) : null
   )
 
-  const [view, setView] = useState('basket') // basket | compare | settings | saved
+  const [view, setView] = useState('basket') // basket | compare | settings | saved | catalog
   const [scanning, setScanning] = useState(false)
   const [searching, setSearching] = useState(false) // search-by-name fallback
   const [scanMode, setScanMode] = useState('single') // single | multi (rapid)
@@ -217,8 +218,11 @@ export default function App() {
       <header className="topbar">
         <h1><span className="logo-dot" /> Basket Score</h1>
         <div className="row">
-          {!editing && !searching && view !== 'settings' && view !== 'saved' && (
+          {!editing && !searching && view !== 'settings' && view !== 'saved' && view !== 'catalog' && (
             <button className="iconbtn" onClick={() => setView('saved')} aria-label="Saved baskets">🗂</button>
+          )}
+          {!editing && !searching && view !== 'settings' && view !== 'saved' && view !== 'catalog' && (
+            <button className="iconbtn" onClick={() => setView('catalog')} aria-label="Best picks">🥪</button>
           )}
           {view !== 'settings' && (
             <button className="iconbtn" onClick={() => setView('settings')} aria-label="Settings">⚙</button>
@@ -268,6 +272,8 @@ export default function App() {
             onClose={() => setView('basket')}
             flash={flash}
           />
+        ) : view === 'catalog' ? (
+          <CatalogCompare onClose={() => setView('basket')} />
         ) : (
           <Settings
             preset={settings.preset}
