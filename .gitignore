@@ -11,3 +11,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Personal-use catalog importer: the scraper, its service_role secret, and any
+# scraped third-party data live here and must never reach the public repo or a
+# deploy. (Mirrors the same ignore on the catalog_items migration branch.)
+/private/
