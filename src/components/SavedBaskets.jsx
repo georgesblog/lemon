@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { isCloudEnabled } from '../lib/supabase.js'
-import { listSaved, createSaved, renameSaved, deleteSaved, loadSavedItems } from '../lib/baskets.js'
+import { listSavedDetailed, createSaved, renameSaved, deleteSaved, loadSavedItems } from '../lib/baskets.js'
 
 // Saved baskets view: save the current basket (as a one-off snapshot or a
 // reusable template), then reload, rename or delete any saved one. Cloud when
@@ -13,12 +13,15 @@ export default function SavedBaskets({ currentItems, onLoad, onClose, flash }) {
   const [asTemplate, setAsTemplate] = useState(false)
   const [saving, setSaving] = useState(false)
   const [renaming, setRenaming] = useState(null) // { id, value }
+  const [degraded, setDegraded] = useState(false) // cloud configured but unreachable
   const cloud = isCloudEnabled()
 
   const refresh = useCallback(async () => {
     setError(false)
     try {
-      setList(await listSaved())
+      const { list, degraded } = await listSavedDetailed()
+      setList(list)
+      setDegraded(degraded)
     } catch {
       setList([])
       setError(true)
@@ -119,6 +122,13 @@ export default function SavedBaskets({ currentItems, onLoad, onClose, flash }) {
       </div>
 
       <div className="sep" />
+
+      {degraded && (
+        <div className="card small" style={{ borderColor: 'var(--warn)' }}>
+          ☁️ Cloud is unavailable right now — showing your on-device baskets. Your
+          Supabase project may be paused; saved baskets will sync again once it’s back.
+        </div>
+      )}
 
       {list == null ? (
         <div className="muted small" style={{ padding: 8 }}>Loading…</div>
