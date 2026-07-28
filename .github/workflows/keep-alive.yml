@@ -1,0 +1,49 @@
+name: Supabase keep-alive
+
+# Supabase's free tier pauses a project after ~7 days with no activity, which
+# takes the app's cloud features (saved-basket sync, share links) offline. This
+# makes one tiny database request every day so the "Lemon" project never idles
+# out. It reuses the same PUBLIC values the app build uses; if they aren't set as
+# repo secrets the job just skips. Never add the service_role key or DB password.
+on:
+  schedule:
+    - cron: '17 6 * * *' # ~06:17 UTC daily — comfortably inside the 7-day window
+  workflow_dispatch: {}
+
+# Don't pile up runs if one is slow.
+concurrency:
+  group: supabase-keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST so the database stays active
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "Supabase secrets not set — nothing to keep alive. Skipping."
+            exit 0
+          fi
+          # A trivial RLS-filtered read still executes a query against Postgres,
+          # which is what resets the inactivity timer. -m caps the wait so a paused
+          # project can't hang the job.
+          code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/baskets?select=id&limit=1" || echo 000)
+          echo "Supabase responded HTTP $code"
+          case "$code" in
+            2*|401|403)
+              # 2xx (rows or empty under RLS) or an auth code both prove the DB
+              # answered — the project is awake.
+              echo "Project is awake."
+              ;;
+            *)
+              echo "No/there was an unexpected response ($code) — the project may be down."
+              exit 1
+              ;;
+          esac

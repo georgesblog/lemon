@@ -96,24 +96,8 @@ const nowIso = () => new Date().toISOString()
 // Every saved basket is summarised as { id, name, isTemplate, store, updatedAt,
 // itemCount, cloud } — the shape the list UI renders.
 
-export async function listSaved() {
-  const session = await cloudSession()
-  if (session) {
-    const { data, error } = await supabase
-      .from('baskets')
-      .select('id, name, is_template, store, updated_at, basket_items(count)')
-      .order('updated_at', { ascending: false })
-    if (error) throw error
-    return (data ?? []).map((b) => ({
-      id: b.id,
-      name: b.name,
-      isTemplate: b.is_template,
-      store: b.store,
-      updatedAt: b.updated_at,
-      itemCount: b.basket_items?.[0]?.count ?? 0,
-      cloud: true,
-    }))
-  }
+// On-device saved baskets, newest first, in the list-UI shape.
+function localList() {
   return localAll()
     .slice()
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
@@ -126,6 +110,44 @@ export async function listSaved() {
       itemCount: b.items?.length ?? 0,
       cloud: false,
     }))
+}
+
+// Cloud-configured but unreachable (e.g. the free-tier project is paused after a
+// week idle) must degrade to the on-device list rather than error out. Returns
+// { list, degraded }, where `degraded` flags that we fell back so the UI can say
+// so instead of showing a scary "couldn't load" state.
+export async function listSavedDetailed() {
+  const session = await cloudSession()
+  if (session) {
+    try {
+      const { data, error } = await supabase
+        .from('baskets')
+        .select('id, name, is_template, store, updated_at, basket_items(count)')
+        .order('updated_at', { ascending: false })
+      if (error) throw error
+      return {
+        list: (data ?? []).map((b) => ({
+          id: b.id,
+          name: b.name,
+          isTemplate: b.is_template,
+          store: b.store,
+          updatedAt: b.updated_at,
+          itemCount: b.basket_items?.[0]?.count ?? 0,
+          cloud: true,
+        })),
+        degraded: false,
+      }
+    } catch {
+      // Reachability failure (paused project, offline, transient 5xx) — show what
+      // we have on the device rather than breaking the view.
+      return { list: localList(), degraded: true }
+    }
+  }
+  return { list: localList(), degraded: false }
+}
+
+export async function listSaved() {
+  return (await listSavedDetailed()).list
 }
 
 export async function createSaved({ name, isTemplate = false, store = null, items = [] }) {
